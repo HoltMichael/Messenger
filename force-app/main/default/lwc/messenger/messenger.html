@@ -1,0 +1,22 @@
+<template>
+    <div class="slds-grid slds-grid_vertical slds-p-around_small">
+        <template if:false={userChosen}>
+            <c-user-search></c-user-search>
+        </template>
+
+        <template if:true={userChosen}>
+            <lightning-button class="slds-p-bottom_small" label="New Thread" ></lightning-button>
+            <template for:each={threadList} for:item="thrd">
+                <lightning-formatted-rich-text class="focus-thread" id={thrd.Id} key={thrd.Id} onclick={toggleFocus} value={thrd.Name} ></lightning-formatted-rich-text>
+            </template>
+            <div class="slds-grid" style="position:absolute;bottom:1rem;left:1rem;border:1px">
+                <div class="slds-col slds-size_3-of-4 " >
+                    <lightning-input></lightning-input>
+                </div>
+                <div class="slds-col slds-size_1-of-4 slds-p-left_small slds-p-top_small">
+                    <lightning-button label="Send"></lightning-button>
+                </div>
+            </div>
+        </template>
+    </div>
+</template>

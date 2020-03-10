@@ -1,0 +1,32 @@
+<template>
+    <div>
+        <lightning-input
+            type="search"
+            onchange={handleKeyChange}
+            class="slds-m-bottom_small"
+            label="Search"
+            value={searchKey}
+        ></lightning-input>
+            <template if:true={users.data}>
+                <lightning-card
+                style="height:250px"
+                title="Users"
+                icon-name="custom:custom63">
+                <template for:each={users.data} for:item="user">
+                    <p class="slds-p-left_small" key={user.Id}>{user.Name}</p>
+                </template>
+                </lightning-card>
+            </template>
+        <template if:true={groups.data}>
+            <div class="slds-p-top_small">
+                <lightning-card
+                title="Groups"
+                icon-name="custom:custom63">
+                <template for:each={groups.data} for:item="group">
+                    <p class="slds-p-left_small" key={group.Id}>{group.Name}</p>
+                </template>
+                </lightning-card>
+            </div>
+        </template>
+    </div>
+</template>
