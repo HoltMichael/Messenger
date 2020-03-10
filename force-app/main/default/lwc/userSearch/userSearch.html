@@ -7,24 +7,41 @@
             label="Search"
             value={searchKey}
         ></lightning-input>
-            <template if:true={users.data}>
-                <lightning-card
-                style="height:250px"
-                title="Users"
-                icon-name="custom:custom63">
-                <template for:each={users.data} for:item="user">
-                    <p class="slds-p-left_small" key={user.Id}>{user.Name}</p>
-                </template>
-                </lightning-card>
+            <template if:true={showUsers}>
+                <div class="slds-card_boundary">
+                    <lightning-card title="Users" icon-name="standard:user">
+                        <div class="slds-scrollable" style={userHeight}>
+                            <template for:each={users.data} for:item="user">
+                                <a href="#" key={user.Id} data-user-id={user.Id} data-user-name={user.Name} onclick={handleSelect}>
+                                    <lightning-layout class="slds-p-left_medium">
+                                        <lightning-layout-item>
+                                            <img src={user.FullPhotoUrl} style="height:1rem;width:1rem" alt="Profile photo" />
+                                        </lightning-layout-item>
+                                        <lightning-layout-item class="slds-p-left_small">
+                                            <p>{user.Name}</p>
+                                        </lightning-layout-item>
+                                    </lightning-layout>
+                                </a>
+                            </template>
+                        </div>
+                    </lightning-card>
+                </div>
             </template>
-        <template if:true={groups.data}>
-            <div class="slds-p-top_small">
-                <lightning-card
-                title="Groups"
-                icon-name="custom:custom63">
-                <template for:each={groups.data} for:item="group">
-                    <p class="slds-p-left_small" key={group.Id}>{group.Name}</p>
-                </template>
+        <template if:true={showGroups}>
+            <div class="slds-m-top_small slds-card_boundary">
+                <lightning-card title="Groups" icon-name="standard:groups">
+                    <div class="slds-scrollable" style={groupHeight}>
+                        <template for:each={groups.data} for:item="group">
+                            <a href="#" key={group.Id} data-user-id={group.Id} data-user-name={group.Name} onclick={handleSelect}>
+                                <lightning-layout class="slds-p-left_small">
+                                    <lightning-layout-item class="slds-p-left_small">
+                                        <p>{group.Name}</p>
+                                    </lightning-layout-item>
+                                </lightning-layout>
+                            </a>
+                            <!--<p class="slds-p-left_small" onclick={handleSelect} key={group.Id}>{group.Name}</p>-->
+                        </template>
+                    </div>
                 </lightning-card>
             </div>
         </template>

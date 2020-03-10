@@ -30,3 +30,8 @@ Thumbs.db
 ehthumbs.db
 [Dd]esktop.ini
 $RECYCLE.BIN/
+
+**CustomApplication
+force-app/main/default/applications/standard__LightningSales.app-meta.xml
+force-app/main/default/flexipages/Sales_UtilityBar.flexipage-meta.xml
+force-app/main/default/groups/Test.group-meta.xml
