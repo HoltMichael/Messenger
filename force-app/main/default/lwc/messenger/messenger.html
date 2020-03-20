@@ -6,7 +6,7 @@
             </lightning-tab>
             <template for:each={chatWindows} for:item="window">
                 <lightning-tab key={window.id} end-icon-name="standard:rtc_presence" label={window.recipientName}>
-                    <c-chat-window recipient-name={window.recipientName} recipient-id={window.recipientId}></c-chat-window>
+                    <c-chat-window active-users-name={objUser.Name} recipient-name={window.recipientName} recipient-id={window.recipientId}></c-chat-window>
                 </lightning-tab>
             </template>
         </lightning-tabset>

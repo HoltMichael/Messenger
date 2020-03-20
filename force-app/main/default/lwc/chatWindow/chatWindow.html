@@ -1,19 +1,14 @@
 <template>
     <div class="slds-grid slds-grid_vertical slds-p-around_small">
-        {recipientName}
-        {recipientId}
         <lightning-button class="slds-p-bottom_small" label="New Thread" ></lightning-button>
-        <template for:each={threadList} for:item="thrd">
+        <!--<template for:each={threadList} for:item="thrd">
             <lightning-formatted-rich-text class="focus-thread" id={thrd.Id} key={thrd.Id} onclick={toggleFocus} value={thrd.Name} ></lightning-formatted-rich-text>
-        </template>
+        </template>-->
+        <lightning-formatted-rich-text class="focus-thread" value={chatText}></lightning-formatted-rich-text>
         <div class="slds-grid" >
-            <div class="slds-col slds-size_3-of-4 " >
-                <lightning-input></lightning-input>
-            </div>
-            <div class="slds-col slds-size_1-of-4 slds-p-left_small slds-p-top_small">
-                <lightning-button label="Send"></lightning-button>
+            <div class="slds-col slds-size_7-of-7 slds-rich-text-editor__toolbar-bottom" >
+                <lightning-input-rich-text disabled-categories="FORMAT_FONT, FORMAT_BODY, ALIGN_TEXT, INSERT_CONTENT, REMOVE_FORMATTING" value={currentText} onkeyup={handleKeyPress}></lightning-input-rich-text>
             </div>
         </div>
     </div>
-    <!--style="position:absolute;bottom:1rem;left:1rem;border:1px"-->
 </template>
