@@ -7,6 +7,11 @@ public with sharing class MessengerUtils {
     }
 
     @AuraEnabled(cacheable=true)
+    public static List<User> findUser(Id userId) {
+        return [SELECT Id, Name, Title, FullPhotoUrl FROM User WHERE Id =: userId];
+    }
+
+    @AuraEnabled(cacheable=true)
     public static List<Group> findGroups(String searchKey) {
         String key = '%' + searchKey + '%';
         system.debug([SELECT Id, Name FROM Group WHERE Name LIKE :key WITH SECURITY_ENFORCED LIMIT 50]);

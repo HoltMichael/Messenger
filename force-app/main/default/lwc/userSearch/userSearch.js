@@ -41,19 +41,14 @@ export default class UserSearch extends LightningElement {
     }
 
     get groupHeight(){
-        console.log('here1');
         if(this.groups.data){
             var height = 10;
             if(this.numGroups < 10){
-                console.log('here2');
                 height = this.numGroups + 1;
             }
             if(height > 10){
-                console.log('here3');
                 height = 10;
             }
-            console.log('here4');
-            console.log(height);
             return 'height:' + height + 'rem;width:24rem';
         }
     }

@@ -1,4 +1,6 @@
 <template>
+    <lightning-button-icon icon-name="utility:end_chat"  alternative-text="End Chat" title="End Chat"></lightning-button-icon>
+    <lightning-button-icon icon-name={muteIcon} onclick={toggleMute}  alternative-text="Notifications Off" title="Notifications Off"></lightning-button-icon>
     <div class="slds-grid slds-grid_vertical slds-p-around_small">
         <lightning-button class="slds-p-bottom_small" label="New Thread" ></lightning-button>
         <!--<template for:each={threadList} for:item="thrd">

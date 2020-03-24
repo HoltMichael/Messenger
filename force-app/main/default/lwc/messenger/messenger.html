@@ -1,12 +1,12 @@
 <template>
     <div class="slds-grid slds-grid_vertical slds-p-around_small">
         <lightning-tabset>
-            <lightning-tab label="Home">
+            <lightning-tab label="Home" value="Home">
                 <c-user-search onselect={handleSelect}></c-user-search>
             </lightning-tab>
             <template for:each={chatWindows} for:item="window">
-                <lightning-tab key={window.id} end-icon-name="standard:rtc_presence" label={window.recipientName}>
-                    <c-chat-window active-users-name={objUser.Name} recipient-name={window.recipientName} recipient-id={window.recipientId}></c-chat-window>
+                <lightning-tab key={window.key} value={window.key} end-icon-name="standard:rtc_presence" label={window.value}>
+                    <c-chat-window active-users-name={objUser.Name} recipient-name={window.value} recipient-id={window.key}></c-chat-window>
                 </lightning-tab>
             </template>
         </lightning-tabset>
