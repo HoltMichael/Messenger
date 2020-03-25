@@ -15,7 +15,7 @@ export default class Messenger extends LightningElement {
     latestMessage;
 
     //Move the focus into the newly created window
-    //If the message comes in, immediately move the focus out
+    //If the message is incoming, immediately move the focus out (Don't want to jump tab without the user's action)
     //This prevents the tab from lazy loading and causing future messages to be missed
     constructor() {
         super();   
@@ -30,14 +30,17 @@ export default class Messenger extends LightningElement {
         }
     }
 
+    //Subscribe to the Platform Event as soon as the component renders
     connectedCallback(){
         this.handleSubscribe();
     }
 
-    // Handles subscribe button click
+    // Handles subscribe to PE
     handleSubscribe() {
         // Callback invoked whenever a new event message is received
+        console.log('Received..');
         const messageCallback = (response) => {
+            console.log('message received..');
             var windowOpen = false;
             this.latestMessage = {
                 msg: response.data.payload.MHolt__Content__c,
@@ -59,23 +62,23 @@ export default class Messenger extends LightningElement {
                 this.selectedChatName = this.latestMessage.fromName;
                 this.createChatWindow(false);
             }  
+            console.log('Passing message..');
             this.passMessagetoChild(this);
         };
 
         // Invoke subscribe method of empApi. Pass reference to messageCallback
         subscribe(this.channelName, -1, messageCallback).then(response => {
             // Response contains the subscription information on successful subscribe call
-            //console.log('Successfully subscribed to : ', JSON.stringify(response.channel));
+            console.log('Successfully subscribed to : ', JSON.stringify(response.channel));
             this.subscription = response;
         });
     }
 
-    passMessagetoChild(self){
-        var allChats = self.template.querySelectorAll('c-chat-window');    
-        allChats.forEach(thisChat => {
-            if(thisChat.recipientId == self.latestMessage.sender || (self.latestMessage.sender == self.userId && self.latestMessage.recip == thisChat.recipientId)){
-                thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.recip, self.latestMessage.msgTime);
-            }
+    registerErrorListener() {
+        // Invoke onError empApi method
+        onError(error => {
+            console.log('Received error from server: ', JSON.stringify(error));
+            // Error contains the server-side error
         });
     }
 
@@ -130,6 +133,15 @@ export default class Messenger extends LightningElement {
         this.delayTimeout = setTimeout(() => {
             func(this, tabId);
         }, delay);
+    }
+
+    passMessagetoChild(self){
+        var allChats = self.template.querySelectorAll('c-chat-window');    
+        allChats.forEach(thisChat => {
+            if(thisChat.recipientId == self.latestMessage.sender || (self.latestMessage.sender == self.userId && self.latestMessage.recip == thisChat.recipientId)){
+                thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.recip, self.latestMessage.msgTime);
+            }
+        });
     }
 
     setActiveTab(self, tabId){
