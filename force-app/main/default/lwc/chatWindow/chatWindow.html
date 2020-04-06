@@ -1,16 +1,18 @@
 <template>
-    <lightning-button-icon icon-name="utility:end_chat"  alternative-text="End Chat" title="End Chat"></lightning-button-icon>
-    <lightning-button-icon icon-name={muteIcon} onclick={toggleMute}  alternative-text="Notifications Off" title="Notifications Off"></lightning-button-icon>
-    <div class="slds-grid slds-grid_vertical slds-p-around_small">
-        <lightning-button class="slds-p-bottom_small" label="New Thread" ></lightning-button>
-        <!--<template for:each={threadList} for:item="thrd">
-            <lightning-formatted-rich-text class="focus-thread" id={thrd.Id} key={thrd.Id} onclick={toggleFocus} value={thrd.Name} ></lightning-formatted-rich-text>
-        </template>-->
-        <lightning-formatted-rich-text class="focus-thread" value={chatText}></lightning-formatted-rich-text>
-        <div class="slds-grid" >
-            <div class="slds-col slds-size_7-of-7 slds-rich-text-editor__toolbar-bottom" >
-                <lightning-input-rich-text disabled-categories="FORMAT_FONT, FORMAT_BODY, ALIGN_TEXT, INSERT_CONTENT, REMOVE_FORMATTING" value={currentText} onkeyup={handleKeyPress}></lightning-input-rich-text>
+    <div class="scroller">
+        <lightning-button-icon icon-name="utility:end_chat"  alternative-text="End Chat" title="End Chat"></lightning-button-icon>
+        <lightning-button-icon icon-name={muteIcon} onclick={toggleMute}  alternative-text="Notifications Off" title="Notifications Off"></lightning-button-icon>
+        <div class="slds-grid slds-grid_vertical slds-p-around_small">
+            <!--<lightning-button class="slds-p-bottom_small" label="New Thread" ></lightning-button>-->
+            <!--<template for:each={threadList} for:item="thrd">
+                <lightning-formatted-rich-text class="focus-thread" id={thrd.Id} key={thrd.Id} onclick={toggleFocus} value={thrd.Name} ></lightning-formatted-rich-text>
+            </template>-->
+            <div class="slds-scrollable focus-thread" style="height:13rem;width:18rem">
+                <template for:each={chatText} for:item="chat">
+                    <lightning-formatted-rich-text key={chat} class="focus-thread" value={chat}></lightning-formatted-rich-text>
+                </template>
             </div>
+            <lightning-input-rich-text class="slds-p-top_xxx-small" disabled-categories="FORMAT_FONT, FORMAT_BODY, ALIGN_TEXT, INSERT_CONTENT, REMOVE_FORMATTING" value={currentText} onkeyup={handleKeyPress}></lightning-input-rich-text>
         </div>
     </div>
 </template>

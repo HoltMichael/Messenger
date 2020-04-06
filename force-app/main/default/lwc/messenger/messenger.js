@@ -22,11 +22,12 @@ export default class Messenger extends LightningElement {
         this.addEventListener('windowChange', this.handleWindowChange.bind(this));
     }
     handleWindowChange(event) {
-        this.setTabAfterTimer(this.setActiveTab, this.selectedChatId, 10);
+        this.callFuncAfterTimer(this.setActiveTab, this.selectedChatId, 10);
         if(!event.detail.focus()){
-            this.setTabAfterTimer(this.setActiveTab,'Home', 10);
-            //We need to re-send the message to the child, once it's been created. Since it didn't exist before
-            this.setTabAfterTimer(this.passMessagetoChild, null, 20);
+            this.callFuncAfterTimer(this.setActiveTab,'Home', 10);
+            //We need to re-send the message to the child, once it's been created. Since it didn't exist before. 
+            //Make sure this is also delayed, since it needs to land after all historical messages are pulled out of the DB.
+            this.callFuncAfterTimer(this.passMessagetoChild, null, 500);
         }
     }
 
@@ -47,10 +48,15 @@ export default class Messenger extends LightningElement {
                 sender: response.data.payload.MHolt__From_User__c,
                 recip: response.data.payload.MHolt__To_User__c,
                 fromName: response.data.payload.MHolt__From_Name__c,
-                msgTime: response.data.payload.MHolt__Timestamp__c,
-            }            
+                msgTime1: response.data.payload.MHolt__Timestamp__c,
+                msgTime2: response.data.payload.MHolt__Timestamp2__c
+            }
+            console.log('timestamps:');
+            console.log(this.latestMessage.msgTime1);
+            console.log(this.latestMessage.msgTime2);
             
             const allChats = this.template.querySelectorAll('c-chat-window');      
+            
             allChats.forEach(thisChat => {
                 if(thisChat.recipientId == this.latestMessage.sender || (this.latestMessage.sender == this.userId && this.latestMessage.recip == thisChat.recipientId)){
                     windowOpen = true;
@@ -62,8 +68,10 @@ export default class Messenger extends LightningElement {
                 this.selectedChatName = this.latestMessage.fromName;
                 this.createChatWindow(false);
             }  
+            
             console.log('Passing message..');
             this.passMessagetoChild(this);
+            //this.callFuncAfterTimer(this.passMessagetoChild(), null, 1000);
         };
 
         // Invoke subscribe method of empApi. Pass reference to messageCallback
@@ -113,6 +121,7 @@ export default class Messenger extends LightningElement {
     handleSelect(event) {
         this.selectedChatId = event.detail.userId();
         this.selectedChatName = event.detail.userName();
+        console.log('Opening window with this user ID: ' + this.selectedChatId);
         this.createChatWindow(true);
     }
 
@@ -129,9 +138,9 @@ export default class Messenger extends LightningElement {
 
     }
 
-    setTabAfterTimer(func, tabId, delay) {
+    callFuncAfterTimer(func, param, delay) {
         this.delayTimeout = setTimeout(() => {
-            func(this, tabId);
+            func(this, param);
         }, delay);
     }
 
@@ -139,7 +148,7 @@ export default class Messenger extends LightningElement {
         var allChats = self.template.querySelectorAll('c-chat-window');    
         allChats.forEach(thisChat => {
             if(thisChat.recipientId == self.latestMessage.sender || (self.latestMessage.sender == self.userId && self.latestMessage.recip == thisChat.recipientId)){
-                thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.recip, self.latestMessage.msgTime);
+                thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.recip, self.latestMessage.msgTime1, self.latestMessage.msgTime2);
             }
         });
     }

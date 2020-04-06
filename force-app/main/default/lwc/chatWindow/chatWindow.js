@@ -2,24 +2,24 @@ import { LightningElement, api, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent'
 import sendMessage from '@salesforce/apex/SendMessageHandler.sendMessage';
 import decryptMessage from '@salesforce/apex/SendMessageHandler.decryptMessage';
-import getTimeStamp from '@salesforce/apex/SendMessageHandler.getTimeStamp';
+import getTimeStamps from '@salesforce/apex/SendMessageHandler.getTimeStamps';
 import getChatHistory from '@salesforce/apex/SendMessageHandler.getChatHistory';
-import Id from '@salesforce/user/Id';
+
 
 export default class ChatWindow extends LightningElement {
     @api recipientName;
     @api recipientId;
     @api activeUsersName;
     @api userId;
-    //userId = Id;
     @track currentThread;
-    @track chatText = '';
+    @track chatText = [];
     response;
     @track mute = false;
     @track muteIcon = "utility:volume_off";
 
     connectedCallback(){
-        console.log(this.userId);
+        console.log('recipientName: ' + this.recipientName);
+        console.log('recipientId: ' + this.recipientId);
         this.getChatHistory();
     }
 
@@ -31,39 +31,47 @@ export default class ChatWindow extends LightningElement {
     }
 
     getChatHistory() {
-        
         getChatHistory({ user1: this.userId, user2: this.recipientId, days:7 })
             .then(result => {
                 console.log(result);
-                this.chatText += result;
-                const blb    = new Blob(result, {type: "text/plain"});
-                const reader = new FileReader();
-                // Start reading the blob as text.
-                reader.readAsText(blb);
-
-                reader.addEventListener('loadend', (e) => {
-                    const text = e.srcElement.result;
-                    console.log(text);
-                  });
+                this.chatText.push(result);
                 this.error = undefined;
+                //Scroll to the bottom of the div, waiting for the div to actually contain the chat first
+                this.delayTimeout = setTimeout(() => {
+                    this.scrollToBottom();
+                }, 100);
             })
             .catch(error => {
                 this.error = error;
             });
-    }    
+    }
 
-
+    //Scroll to the bottom of the chat window.
+    scrollToBottom(){
+        var objDiv = this.template.querySelector('.slds-scrollable');
+        objDiv.scrollTop = objDiv.scrollHeight;
+    }
 
     @api
-    decryptMessage(message, sender, recip, msgTime) {
+    decryptMessage(message, sender, recip, msgTime, msgTime2) {
         console.log('decrypting..');
         decryptMessage({ msg: message, snd: sender })
             .then(result => {
-                this.chatText += msgTime + ' ' + result;
+                console.log(msgTime);
+                console.log(msgTime2);
+                if(this.userId == sender){
+                    this.chatText.push (msgTime + ' ' + result);
+                }else{
+                    this.chatText.push (msgTime2 + ' ' + result);
+                }
+                console.log('this.mute: ' + this.mute);
+                console.log('sender ' + sender);
+                console.log('this.userId ' + this.userId);
                 if(!this.mute && sender != this.userId){
                     this.showToast(result);
                 }
                 this.error = undefined;
+                this.scrollToBottom();
             })
             .catch(error => {
                 this.error = error;
@@ -71,6 +79,7 @@ export default class ChatWindow extends LightningElement {
     }
 
     showToast(msg) {
+        console.log('toasting...');
         var strippedMsg = msg.replace(/(<([^>]+)>)/ig,"");
         const event = new ShowToastEvent({
             title: this.recipientName,
@@ -79,18 +88,20 @@ export default class ChatWindow extends LightningElement {
         this.dispatchEvent(event);
     }
 
-    getTimeStamp(){
-        getTimeStamp()
+    /*getTimeStamps(){
+        getTimeStamps()
             .then(result => {
                 return result;
             })
             .catch(error =>{
                 console.log(error);
             });
-    }
+    }*/
 
     sendMessage(message) {       
+        console.log('Sending...');
         console.log(this.activeUsersName);
+        console.log(this.userId);
         sendMessage({ message: message, thread: this.currentThread, recipientId: this.recipientId, senderId: this.userId, name: this.activeUsersName })
             .then(result => {
                 this.response = result;

@@ -1,3 +1,7 @@
 .focus-thread {
     background-color: #f2f2f2;
 }
+
+.THIS .canEnter .ql-editor.slds-rich-text-area__content {
+    min-height:14rem;
+}
