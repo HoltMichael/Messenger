@@ -10,6 +10,7 @@ package.xml
 **profiles
 **CustomApplication
 force-app/main/default/applications/standard__LightningSales.app-meta.xml
+**flexipage
 
 # LWC Jest
 **/__tests__/**
