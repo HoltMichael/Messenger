@@ -1,4 +1,9 @@
 public without sharing class SendMessageHandler {
+    private static Map<String, Integer> monthIntegersByName = new Map<String, Integer>
+    {'Jan' => 1, 'Feb' => 2,'Mar' => 3, 'Apr' => 4, 'May' => 5, 'June' => 6, 'July' => 7, 'Aug' => 8, 'Sep' => 9, 'Oct' => 10, 'Nov' => 11, 'Dec' => 12};
+    private static Map<Integer, String> monthNamesByInteger = new Map<Integer, String>
+    {1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'June', 7 => 'July', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'};
+    
     @AuraEnabled
     public static string sendMessage(String message, String thread, String recipientId, String senderId, String name){ 
         system.debug(name);
@@ -12,13 +17,14 @@ public without sharing class SendMessageHandler {
 
         Database.UpsertResult result = database.upsert(msg);
         if(result.isSuccess()){
-            publishEvent(recipientId, senderId, name, encryptedMsg, times);
+            publishEvent(recipientId, senderId, name, encryptedMsg, times.get(senderId));
         }
 
         return null;
     }
 
     /*
+        getTimeInTimezoneForUsers
         A TimeZoneSidKey has a value of eg. (GMT+11:00) Solomon Islands Time (Pacific/Guadalcanal)
         And a label of Pacific/Guadalcanal. 
         Need to extract the specific time values and then detuct from the GMT to provide a time to the recipient in their region.
@@ -48,8 +54,8 @@ public without sharing class SendMessageHandler {
     }
 
     @AuraEnabled
-    public static List<string> getChatHistory(String user1, String user2, integer days){
-        List<String> returnMessages = new List<String>();
+    public static List<MessageWrapper> getChatHistory(String user1, String user2, integer days){
+        List<MessageWrapper> returnMessages = new List<MessageWrapper>();
         MHolt__Chat_Message_Code__mdt cryptoKeyAsString = [SELECT id, MHolt__Key__c FROM MHolt__Chat_Message_Code__mdt WHERE MasterLabel='Key'][0];
         Blob cryptoKey = EncodingUtil.base64decode(cryptoKeyAsString.MHolt__Key__c);
         user1 = '%' + user1 + '%';
@@ -63,29 +69,31 @@ public without sharing class SendMessageHandler {
                                                 AND createdDate = LAST_N_DAYS:7
                                                 ORDER BY createdDate Asc];
 
-        system.debug('chatMsgs: ' + chatMsgs);  
         for(MHolt__Chat_Message__c msg : chatMsgs){
-            system.debug('Id: ' + chatMsgs);
             String DbMsg = msg.MHolt__Message__c;
             Blob Dbbase64EncryptedMessage = EncodingUtil.base64decode(DbMsg);
             blob DbdecryptedString = Crypto.decryptWithManagedIV('AES256', cryptoKey, DBbase64EncryptedMessage);
+            
+            MessageWrapper wrap = new MessageWrapper(DbdecryptedString.toString(), msg.OwnerId, msg.Owner.Name);
+
             if(msg.OwnerId == userinfo.getuserid()){
-                returnMessages.add(msg.MHolt__Timestamp1_String__c + ' ' + msg.Owner.Name + ':' + DbdecryptedString.toString());
+                wrap.timestamp = msg.MHolt__Timestamp1_String__c;
+                
+                //returnMessages.add(msg.MHolt__Timestamp1_String__c + ' ' + msg.Owner.Name + ':' + DbdecryptedString.toString());
             }else{
-                returnMessages.add(msg.MHolt__Timestamp2_String__c + ' ' + msg.Owner.Name + ':' + DbdecryptedString.toString());
+                wrap.timestamp = msg.MHolt__Timestamp2_String__c;
+                //returnMessages.add(msg.MHolt__Timestamp2_String__c + ' ' + msg.Owner.Name + ':' + DbdecryptedString.toString());
             }
+            returnMessages.add(wrap);
         }
         system.debug('returnMessages: ' + returnMessages);
         return returnMessages;
         
     }
 
-    public static void publishEvent(string recip, String sdr, String nm, String msg, Map<Id, DateTime> times){
-        //String timeStamp = getTimeStamp(system.NOW());
-        List<String> timesAsString = getTimeStamps(times.values());
-        system.debug('timesAsString: ' + timesAsString);
-        MHolt__Message__e evt = new MHolt__Message__e(MHolt__Content__c = msg, MHolt__From_User__c = sdr, MHolt__To_User__c = recip, MHolt__Timestamp__c = timesAsString[0], MHolt__Timestamp2__c = timesAsString[1], MHolt__From_Name__c = nm);
-        system.debug(evt);
+    public static void publishEvent(string recip, String sdr, String nm, String msg, DateTime times){
+        String timesAsString = getTimeStamps(new List<DateTime>{times})[0];
+        MHolt__Message__e evt = new MHolt__Message__e(MHolt__Content__c = msg, MHolt__From_User__c = sdr, MHolt__To_User__c = recip, MHolt__Timestamp__c = timesAsString, MHolt__From_Name__c = nm);
         Database.SaveResult result = EventBus.publish(evt);
         /*// Inspect publishing result for each event
         for (Database.SaveResult sr : results) {
@@ -102,12 +110,26 @@ public without sharing class SendMessageHandler {
         }*/
     }
 
+    /*
+        getTimeStampForRecipient
+        Rather than use the current timezone of the user, use the exact time the sender sent the message to
+        calculate the time of the recipient. This way, the times will match up exactly, even across timezones
+    */
+    @AuraEnabled
+    public static string getTimeStampForRecipient(String tm){
+        List<String> dateValues = tm.split(' ');
+        List<String> timeValues = dateValues[3].split(':');
+        Datetime recipientTime = Datetime.newInstance(Integer.valueOf(dateValues[2]), monthIntegersByName.get(dateValues[1]), Integer.valueOf(dateValues[0]), Integer.valueOf(timeValues[0]), Integer.valueOf(timeValues[1]), Integer.valueOf(timeValues[2]));
+        String recipientTimeString = getTimeStamps(new List<DateTime>{recipientTime})[0];
+        return recipientTimeString;
+    }
+
     @AuraEnabled
     public static List<String> getTimeStamps(List<DateTime> dts){
         List<String> timestamps = new List<String>();
         for(DateTime dt : dts){
             Integer day = dt.dayGmt();
-            String mth = getMonthWritten(dt.monthGmt());
+            String mth =  monthNamesByInteger.get(dt.monthGmt());
             Integer year = dt.yearGmt();
             Integer hour = dt.hourGmt();
             Integer min = dt.minuteGmt();
@@ -132,36 +154,6 @@ public without sharing class SendMessageHandler {
         return timestamps; 
     }
 
-    public static String getMonthWritten(integer mth){
-        switch on mth {
-            when 1 {
-                return 'Jan';
-            }when 2 {		
-                return 'Feb';
-            }when 3 {
-                return 'Mar';
-            }when 4 {		  
-                return 'Apr';
-            }when 5{
-                return 'May';
-            }when 6{
-                return 'Jun';
-            }when 7{
-                return 'Jul';
-            }when 8{
-                return 'Aug';
-            }when 9{
-                return 'Sep';
-            }when 10{
-                return 'Oct';
-            }when 11{
-                return 'Nov';
-            }when else{
-                return 'Dec';
-            }
-        }
-    }
-
     @AuraEnabled
     public static String decryptMessage(String msg, String snd){
         system.debug(msg);
@@ -179,5 +171,30 @@ public without sharing class SendMessageHandler {
         Blob decryptedData = Crypto.decryptWithManagedIV('AES256', cryptoKey, base64EncryptedMessage);
         system.debug(nm + ':' + decryptedData.toString());
         return nm + ':' + decryptedData.toString();
+    }
+
+    public class MessageWrapper{
+        @AuraEnabled
+        public String message;
+        @AuraEnabled
+        public String timestamp;
+        @AuraEnabled
+        public String senderId;
+        @AuraEnabled
+        public String senderName;
+
+        public MessageWrapper(String m, String t, String i, String n){
+            message = m;
+            timestamp = t;
+            senderId = i;
+            senderName = n;
+        }
+ 
+        public MessageWrapper(String m, String i, String n){
+            message = m;
+            senderId = i;
+            senderName = n;
+        }
+
     }
 }

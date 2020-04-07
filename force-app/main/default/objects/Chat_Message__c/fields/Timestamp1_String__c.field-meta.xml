@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Timestamp1_String__c</fullName>
+    <externalId>false</externalId>
+    <formula>TEXT( DAY(  DATEVALUE (Timestamp1__c)  ) )
+&amp; &quot; &quot;
+&amp; CASE(MONTH(  DATEVALUE (Timestamp1__c)),
+1, &quot;Jan&quot;,
+2, &quot;Feb&quot;,
+3, &quot;Mar&quot;, 
+4, &quot;Apr&quot;, 
+5, &quot;May&quot;, 
+6, &quot;June&quot;,
+7, &quot;July&quot;,
+8, &quot;Aug&quot;,
+9, &quot;Sep&quot;,
+10, &quot;Oct&quot;,
+11, &quot;Nov&quot;,
+12, &quot;Dec&quot;,
+&quot;None&quot;)
+&amp; &quot; &quot; &amp; TEXT( YEAR(  DATEVALUE (Timestamp1__c)  ) )   
+&amp; &quot; &quot; &amp; TEXT(TIMEVALUE(Timestamp1__c))</formula>
+    <formulaTreatBlanksAs>BlankAsZero</formulaTreatBlanksAs>
+    <label>Timestamp1 String</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

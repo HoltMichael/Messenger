@@ -27,7 +27,7 @@ export default class Messenger extends LightningElement {
             this.callFuncAfterTimer(this.setActiveTab,'Home', 10);
             //We need to re-send the message to the child, once it's been created. Since it didn't exist before. 
             //Make sure this is also delayed, since it needs to land after all historical messages are pulled out of the DB.
-            this.callFuncAfterTimer(this.passMessagetoChild, null, 500);
+            //this.callFuncAfterTimer(this.passMessagetoChild, null, 500); TODO: Come back and sort this stuff out!
         }
     }
 
@@ -49,11 +49,8 @@ export default class Messenger extends LightningElement {
                 recip: response.data.payload.MHolt__To_User__c,
                 fromName: response.data.payload.MHolt__From_Name__c,
                 msgTime1: response.data.payload.MHolt__Timestamp__c,
-                msgTime2: response.data.payload.MHolt__Timestamp2__c
             }
             console.log('timestamps:');
-            console.log(this.latestMessage.msgTime1);
-            console.log(this.latestMessage.msgTime2);
             
             const allChats = this.template.querySelectorAll('c-chat-window');      
             
@@ -148,7 +145,7 @@ export default class Messenger extends LightningElement {
         var allChats = self.template.querySelectorAll('c-chat-window');    
         allChats.forEach(thisChat => {
             if(thisChat.recipientId == self.latestMessage.sender || (self.latestMessage.sender == self.userId && self.latestMessage.recip == thisChat.recipientId)){
-                thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.recip, self.latestMessage.msgTime1, self.latestMessage.msgTime2);
+                thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.recip, self.latestMessage.msgTime1);
             }
         });
     }

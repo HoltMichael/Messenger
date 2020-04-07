@@ -2,9 +2,8 @@ import { LightningElement, api, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent'
 import sendMessage from '@salesforce/apex/SendMessageHandler.sendMessage';
 import decryptMessage from '@salesforce/apex/SendMessageHandler.decryptMessage';
-import getTimeStamps from '@salesforce/apex/SendMessageHandler.getTimeStamps';
+import getTimeStampForRecipient from '@salesforce/apex/SendMessageHandler.getTimeStampForRecipient';
 import getChatHistory from '@salesforce/apex/SendMessageHandler.getChatHistory';
-
 
 export default class ChatWindow extends LightningElement {
     @api recipientName;
@@ -18,8 +17,6 @@ export default class ChatWindow extends LightningElement {
     @track muteIcon = "utility:volume_off";
 
     connectedCallback(){
-        console.log('recipientName: ' + this.recipientName);
-        console.log('recipientId: ' + this.recipientId);
         this.getChatHistory();
     }
 
@@ -34,16 +31,34 @@ export default class ChatWindow extends LightningElement {
         getChatHistory({ user1: this.userId, user2: this.recipientId, days:7 })
             .then(result => {
                 console.log(result);
-                this.chatText.push(result);
+                this.displayMessage(result);
                 this.error = undefined;
-                //Scroll to the bottom of the div, waiting for the div to actually contain the chat first
-                this.delayTimeout = setTimeout(() => {
-                    this.scrollToBottom();
-                }, 100);
             })
             .catch(error => {
                 this.error = error;
             });
+    }
+
+    //History messages are missing the sender name!
+    displayMessage(allMessageContents){
+        console.log('Displaying the following message: ' + allMessageContents);
+        allMessageContents.forEach(msg => {
+            console.log(msg);
+            var cls = '';
+            console.log(msg.senderId);
+            if(msg.senderId == this.userId){
+                cls = 'my-message both-message slds-float_right';
+            }else{
+                console.log('left');
+                cls = 'their-message both-message slds-float_left';
+            }
+            this.chatText.push({text: msg.message, senderName: msg.senderName, timestamp: msg.timestamp, class: cls});
+            //Scroll to the bottom of the div, waiting for the div to actually contain the chat first
+            this.delayTimeout = setTimeout(() => {
+                this.scrollToBottom();
+            }, 100);
+        });
+        this.scrollToBottom;
     }
 
     //Scroll to the bottom of the chat window.
@@ -53,20 +68,17 @@ export default class ChatWindow extends LightningElement {
     }
 
     @api
-    decryptMessage(message, sender, recip, msgTime, msgTime2) {
-        console.log('decrypting..');
+    decryptMessage(message, sender, recip, msgTime) {
         decryptMessage({ msg: message, snd: sender })
             .then(result => {
-                console.log(msgTime);
-                console.log(msgTime2);
                 if(this.userId == sender){
-                    this.chatText.push (msgTime + ' ' + result);
-                }else{
-                    this.chatText.push (msgTime2 + ' ' + result);
+                    console.log('This is the sender');
+                    var fullMessage = [{message: result, senderId: sender, timestamp: msgTime}];
+                    console.log('This is the message: ' + fullMessage);
+                    this.displayMessage(fullMessage);
+                }else{    
+                    this.getTimeStampForRecipient(msgTime, sender, result);
                 }
-                console.log('this.mute: ' + this.mute);
-                console.log('sender ' + sender);
-                console.log('this.userId ' + this.userId);
                 if(!this.mute && sender != this.userId){
                     this.showToast(result);
                 }
@@ -78,8 +90,22 @@ export default class ChatWindow extends LightningElement {
             });
     }
 
+    @api
+    getTimeStampForRecipient(time, sender, msg) {
+        getTimeStampForRecipient({tm: time})
+            .then(result => {
+                console.log('This is the receiver');
+                //this.chatText.push (result + ' ' + msg);
+                var fullMessage = [{message: msg, senderId: sender, timestamp: result}];
+                console.log('This is the message: ' + fullMessage);
+                this.displayMessage(fullMessage);
+            })
+            .catch(error => {
+                this.error = error;
+            })
+    }
+
     showToast(msg) {
-        console.log('toasting...');
         var strippedMsg = msg.replace(/(<([^>]+)>)/ig,"");
         const event = new ShowToastEvent({
             title: this.recipientName,
@@ -88,20 +114,7 @@ export default class ChatWindow extends LightningElement {
         this.dispatchEvent(event);
     }
 
-    /*getTimeStamps(){
-        getTimeStamps()
-            .then(result => {
-                return result;
-            })
-            .catch(error =>{
-                console.log(error);
-            });
-    }*/
-
     sendMessage(message) {       
-        console.log('Sending...');
-        console.log(this.activeUsersName);
-        console.log(this.userId);
         sendMessage({ message: message, thread: this.currentThread, recipientId: this.recipientId, senderId: this.userId, name: this.activeUsersName })
             .then(result => {
                 this.response = result;
@@ -129,11 +142,7 @@ export default class ChatWindow extends LightningElement {
         this.currentThread = event.currentTarget.id;
     }
 
-        /*@track threadList = [
-        {
-            Id:'001',
-            Name:'Thread 1'
-        },
+        /*@track threadList = [{Id:'001',Name:'Thread 1'},
         {
             Id:'002',
             Name:'Thread 2'

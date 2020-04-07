@@ -7,9 +7,19 @@
             <!--<template for:each={threadList} for:item="thrd">
                 <lightning-formatted-rich-text class="focus-thread" id={thrd.Id} key={thrd.Id} onclick={toggleFocus} value={thrd.Name} ></lightning-formatted-rich-text>
             </template>-->
-            <div class="slds-scrollable focus-thread" style="height:13rem;width:18rem">
+            <div class="slds-scrollable slds-p-around_small" style="height:13rem;">
                 <template for:each={chatText} for:item="chat">
-                    <lightning-formatted-rich-text key={chat} class="focus-thread" value={chat}></lightning-formatted-rich-text>
+                    <div key={chat} class={chat.class}>
+                        <p>
+                            <lightning-formatted-rich-text style="font-size:9px; color:grey" value={chat.timestamp}></lightning-formatted-rich-text>
+                        </p>
+                        <p>
+                            <lightning-formatted-rich-text style="font-weight: bold; color:grey" value={chat.senderName}></lightning-formatted-rich-text>
+                        </p>
+                        <p>
+                            <lightning-formatted-rich-text value={chat.text}></lightning-formatted-rich-text>
+                        </p>
+                    </div>
                 </template>
             </div>
             <lightning-input-rich-text class="slds-p-top_xxx-small" disabled-categories="FORMAT_FONT, FORMAT_BODY, ALIGN_TEXT, INSERT_CONTENT, REMOVE_FORMATTING" value={currentText} onkeyup={handleKeyPress}></lightning-input-rich-text>
