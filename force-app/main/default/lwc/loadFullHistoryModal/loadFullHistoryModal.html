@@ -1,0 +1,21 @@
+<template>
+    <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open" aria-labelledby="modal-heading-01" aria-modal="true" aria-describedby="modal-content-id-1">
+        <div class="slds-modal__container">
+            <header class="slds-modal__header">
+                <h2 id="modal-heading-01" class="slds-modal__title slds-hyphenate">Load Full Chat History with {recipientName}?</h2>
+            </header>
+            <div class="slds-modal__content slds-p-around_medium" id="modal-content-id-1">
+                <p>For performance, messenger loads the last 50 messages in your conversation. Conversations with many messages can take a long load time. 
+                    If you'd like to load your full chat history, proceed below. Alternatively, choose to load the last 300 messages.</p>
+            </div>
+            <footer class="slds-modal__footer">
+                <div class="slds-align_absolute-center">
+                    <button class="slds-button slds-button_neutral" onclick={handleClose}>Close</button>
+                    <button class="slds-button slds-button_brand" data-number='300' onclick={handleConfirmation}>Load the last 300 messages</button>
+                </div>
+                <button class="slds-m-top_small slds-button slds-button_brand" data-number='50000' onclick={handleConfirmation}>I understand, load our full chat history</button>
+            </footer>
+        </div>
+    </section>
+    <div class="slds-backdrop slds-backdrop_open"></div>
+</template>

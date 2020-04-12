@@ -11,89 +11,18 @@ public without sharing class SendMessageHandler {
         Blob cryptoKey = EncodingUtil.base64decode(cryptoKeyAsString.MHolt__Key__c);
         Blob encryptedData = Crypto.encryptWithManagedIV('AES256', cryptoKey, Blob.valueOf(message));
         String encryptedMsg = EncodingUtil.base64encode(encryptedData);
-        Map<Id, DateTime> times = getTimeInTimezoneForUsers(new List<String>{recipientId, senderId});
-
-        MHolt__Chat_Message__c msg = new MHolt__Chat_Message__c(Name = '', MHolt__Timestamp1__c=times.get(senderId), MHolt__Timestamp2__c=times.get(recipientId), MHolt__Message__c = encryptedMsg, MHolt__Participant_1__c = recipientId, MHolt__Participant_2__c = senderId);
+        List<User> users = getUsersWithSidkey(new List<String>{recipientId, senderId});
+        MHolt__Chat_Message__c msg = new MHolt__Chat_Message__c(Name = '', MHolt__Message__c = encryptedMsg, MHolt__Participant_1__c = recipientId, MHolt__Participant_2__c = senderId);
 
         Database.UpsertResult result = database.upsert(msg);
         if(result.isSuccess()){
-            publishEvent(recipientId, senderId, name, encryptedMsg, times.get(senderId));
+            publishEvent(recipientId, senderId, name, encryptedMsg);
         }
-
         return null;
     }
 
-    /*
-        getTimeInTimezoneForUsers
-        A TimeZoneSidKey has a value of eg. (GMT+11:00) Solomon Islands Time (Pacific/Guadalcanal)
-        And a label of Pacific/Guadalcanal. 
-        Need to extract the specific time values and then detuct from the GMT to provide a time to the recipient in their region.
-    */
-    public static Map<Id, DateTime> getTimeInTimezoneForUsers(List<id> userIds){
-        List<User> users = [SELECT Id, TimeZoneSidKey FROM User WHERE Id IN: userIds];
-        Map<Id, DateTime> userTimes = new Map<Id, DateTime>();
-        Schema.DescribeFieldResult fieldResult = User.TimeZoneSidKey.getdescribe();
-        List<Schema.PicklistEntry> ple = fieldResult.getPicklistValues();
-        for(User u : users){
-            for(Schema.PicklistEntry p : ple)
-            {
-                if(p.getValue() == u.TimeZoneSidKey){
-                    //Initiate the user time as GMT
-                    DateTime userTime = System.now();
-                    String offset = p.getLabel().substringBetween('T',')');
-                    //give us the hour / minute offsets
-                    List<String> denominationOffsets = offset.split(':');
-                    userTime = userTime.addHours(Integer.valueOf(denominationOffsets[0]));
-                    userTime = userTime.addMinutes(Integer.valueOf(denominationOffsets[1]));
-                    userTimes.put(u.id, userTime);
-                }
-            }
-        }
-        
-        return userTimes;
-    }
-
-    @AuraEnabled
-    public static List<MessageWrapper> getChatHistory(String user1, String user2, integer days){
-        List<MessageWrapper> returnMessages = new List<MessageWrapper>();
-        MHolt__Chat_Message_Code__mdt cryptoKeyAsString = [SELECT id, MHolt__Key__c FROM MHolt__Chat_Message_Code__mdt WHERE MasterLabel='Key'][0];
-        Blob cryptoKey = EncodingUtil.base64decode(cryptoKeyAsString.MHolt__Key__c);
-        user1 = '%' + user1 + '%';
-        user2 = '%' + user2 + '%';
-        
-        List<MHolt__Chat_Message__c> chatMsgs = [SELECT name, OwnerId, Owner.Name, MHolt__From_Name__c, MHolt__Message__c, MHolt__Participants__c, createdDate,
-                                                        MHolt__Timestamp1_String__c, MHolt__Timestamp2_String__c
-                                                FROM MHolt__Chat_Message__c 
-                                                WHERE MHolt__Participants__c like :user1
-                                                AND MHolt__Participants__c like :user2
-                                                AND createdDate = LAST_N_DAYS:7
-                                                ORDER BY createdDate Asc];
-
-        for(MHolt__Chat_Message__c msg : chatMsgs){
-            String DbMsg = msg.MHolt__Message__c;
-            Blob Dbbase64EncryptedMessage = EncodingUtil.base64decode(DbMsg);
-            blob DbdecryptedString = Crypto.decryptWithManagedIV('AES256', cryptoKey, DBbase64EncryptedMessage);
-            
-            MessageWrapper wrap = new MessageWrapper(DbdecryptedString.toString(), msg.OwnerId, msg.Owner.Name);
-
-            if(msg.OwnerId == userinfo.getuserid()){
-                wrap.timestamp = msg.MHolt__Timestamp1_String__c;
-                
-                //returnMessages.add(msg.MHolt__Timestamp1_String__c + ' ' + msg.Owner.Name + ':' + DbdecryptedString.toString());
-            }else{
-                wrap.timestamp = msg.MHolt__Timestamp2_String__c;
-                //returnMessages.add(msg.MHolt__Timestamp2_String__c + ' ' + msg.Owner.Name + ':' + DbdecryptedString.toString());
-            }
-            returnMessages.add(wrap);
-        }
-        system.debug('returnMessages: ' + returnMessages);
-        return returnMessages;
-        
-    }
-
-    public static void publishEvent(string recip, String sdr, String nm, String msg, DateTime times){
-        String timesAsString = getTimeStamps(new List<DateTime>{times})[0];
-        MHolt__Message__e evt = new MHolt__Message__e(MHolt__Content__c = msg, MHolt__From_User__c = sdr, MHolt__To_User__c = recip, MHolt__Timestamp__c = timesAsString, MHolt__From_Name__c = nm);
+    public static void publishEvent(string recip, String sdr, String nm, String msg){
+        MHolt__Message__e evt = new MHolt__Message__e(MHolt__Content__c = msg, MHolt__From_User__c = sdr, MHolt__To_User__c = recip, MHolt__From_Name__c = nm);
         Database.SaveResult result = EventBus.publish(evt);
         /*// Inspect publishing result for each event
         for (Database.SaveResult sr : results) {
@@ -110,20 +39,112 @@ public without sharing class SendMessageHandler {
         }*/
     }
 
+
     /*
-        getTimeStampForRecipient
-        Rather than use the current timezone of the user, use the exact time the sender sent the message to
-        calculate the time of the recipient. This way, the times will match up exactly, even across timezones
+        shareContent
+        User has attempted to send a file to their recipient. Loop through all of the files which have been sent
+        And create a ContentDocumentLink to the user or group to be shared with.
     */
     @AuraEnabled
-    public static string getTimeStampForRecipient(String tm){
-        List<String> dateValues = tm.split(' ');
-        List<String> timeValues = dateValues[3].split(':');
-        Datetime recipientTime = Datetime.newInstance(Integer.valueOf(dateValues[2]), monthIntegersByName.get(dateValues[1]), Integer.valueOf(dateValues[0]), Integer.valueOf(timeValues[0]), Integer.valueOf(timeValues[1]), Integer.valueOf(timeValues[2]));
-        String recipientTimeString = getTimeStamps(new List<DateTime>{recipientTime})[0];
-        return recipientTimeString;
+    public static String shareContent(id userOrGroupId, List<id> documentIds){
+        List<ContentDocumentLink> cdlsToInsert = new List<ContentDocumentLink>();
+        String result;
+        for(id contentdocId : documentIds){
+            ContentDocumentLink cdl = new ContentDocumentLink(LinkedEntityId = userOrGroupId, ShareType = 'V', ContentDocumentId=contentdocId);
+            cdlsToInsert.add(cdl);
+        }
+        system.debug(cdlsToInsert);
+        try{
+            insert cdlsToInsert;
+            result = 'Success';
+        }catch(exception e){
+            result = e.getMessage();
+        }
+        return result;
     }
 
+    /*
+        getUsersWithSidkey
+        Takes a list of user IDs, returns a list of users with TimeZoneSidKey field
+        Query required for getTimeInTimezoneForUsers method. Abstracted away, so getTimeInTimezoneForUsers 
+        can be called within a loop without hitting SOQL limits.
+    */
+    public static List<User> getUsersWithSidkey(List<Id> userIds){
+        return [SELECT Id, TimeZoneSidKey FROM User WHERE Id IN: userIds];
+    }
+
+    /*
+        getTimeInTimezoneForUsers
+        A TimeZoneSidKey has a value of eg. (GMT+11:00) Solomon Islands Time (Pacific/Guadalcanal)
+        And a label of Pacific/Guadalcanal. 
+        Method extracts the specific time values and then adds/deducts from GMT to provide a time to the recipient in their region.
+    */
+    public static Map<Id, DateTime> getTimeInTimezoneForUsers(List<User> users, DateTime GMTTime){
+        system.debug('GMTTime: ' + GMTTime);
+        Map<Id, DateTime> userTimes = new Map<Id, DateTime>();
+        Schema.DescribeFieldResult fieldResult = User.TimeZoneSidKey.getdescribe();
+        List<Schema.PicklistEntry> ple = fieldResult.getPicklistValues();
+        for(User u : users){
+            for(Schema.PicklistEntry p : ple)
+            {
+                if(p.getValue() == u.TimeZoneSidKey){
+                    //Initiate the user time as GMT
+                    DateTime userTime = GMTTime;
+                    String offset = p.getLabel().substringBetween('T',')');
+                    //give us the hour / minute offsets
+                    List<String> denominationOffsets = offset.split(':');
+                    system.debug('offset: ' + offset);
+                    system.debug('denominationOffsets: ' + denominationOffsets);
+                    userTime = userTime.addHours(Integer.valueOf(denominationOffsets[0]));
+                    userTime = userTime.addMinutes(Integer.valueOf(denominationOffsets[1]));
+                    userTimes.put(u.id, userTime);
+                }
+            }
+        }
+        
+        return userTimes;
+    }
+
+    @AuraEnabled
+    public static List<MessageWrapper> getChatHistory(String user1, String user2, Integer lim){
+        system.debug(lim);
+        List<MessageWrapper> returnMessages = new List<MessageWrapper>();
+        MHolt__Chat_Message_Code__mdt cryptoKeyAsString = [SELECT id, MHolt__Key__c FROM MHolt__Chat_Message_Code__mdt WHERE MasterLabel='Key'][0];
+        Blob cryptoKey = EncodingUtil.base64decode(cryptoKeyAsString.MHolt__Key__c);
+        String user1Like = '%' + user1 + '%';
+        String user2Like = '%' + user2 + '%';
+        
+        //Need to order DESC to get the latest messages, as we pull a maximum of 
+        List<MHolt__Chat_Message__c> chatMsgs = [SELECT name, OwnerId, Owner.Name, MHolt__From_Name__c, MHolt__Message__c, MHolt__Participants__c, createdDate
+                                                FROM MHolt__Chat_Message__c 
+                                                WHERE MHolt__Participants__c like :user1Like
+                                                AND MHolt__Participants__c like :user2Like
+                                                ORDER BY createdDate DESC
+                                                Limit :lim];
+        system.debug(chatMsgs);
+        List<User> users = getUsersWithSidkey(new List<String>{user1, user2});
+        //Loop over the list of messages backwards, as they had to be pulled out of the DB DESC
+        for(Integer i = chatMsgs.size() - 1; i >= 0; i--){
+            MHolt__Chat_Message__c msg = chatMsgs[i];
+            String DbMsg = msg.MHolt__Message__c;
+            Blob Dbbase64EncryptedMessage = EncodingUtil.base64decode(DbMsg);
+            blob DbdecryptedString = Crypto.decryptWithManagedIV('AES256', cryptoKey, DBbase64EncryptedMessage);
+            
+            Map<Id, DateTime> timesByUser = getTimeInTimezoneForUsers(users, msg.createdDate);
+            MessageWrapper wrap = new MessageWrapper(DbdecryptedString.toString(), msg.OwnerId, msg.Owner.Name, getTimeStamps(new List<DateTime>{timesByUser.get(userinfo.getuserid())})[0]);
+
+            returnMessages.add(wrap);
+        }
+        system.debug('returnMessages: ' + returnMessages);
+        return returnMessages;
+        
+    }
+
+    /*
+        getTimeStamps
+        Takes a list of date times and returns a list of formatted strings
+        To remove confusion between date formats, the String uses the following: "5 Apr 20 10:30:00"
+    */
     @AuraEnabled
     public static List<String> getTimeStamps(List<DateTime> dts){
         List<String> timestamps = new List<String>();
@@ -155,7 +176,7 @@ public without sharing class SendMessageHandler {
     }
 
     @AuraEnabled
-    public static String decryptMessage(String msg, String snd){
+    public static MessageWrapper decryptMessage(String msg, String snd){
         system.debug(msg);
         String nm = '';
         try{
@@ -170,20 +191,27 @@ public without sharing class SendMessageHandler {
         Blob base64EncryptedMessage = EncodingUtil.base64decode(msg);
         Blob decryptedData = Crypto.decryptWithManagedIV('AES256', cryptoKey, base64EncryptedMessage);
         system.debug(nm + ':' + decryptedData.toString());
-        return nm + ':' + decryptedData.toString();
+
+        List<User> currentUser = getUsersWithSidkey(new List<String>{userInfo.getUserId()});
+        Map<Id, DateTime> timesByUser = getTimeInTimezoneForUsers(currentUser, system.now());
+        MessageWrapper wrap = new MessageWrapper(decryptedData.toString(), null, null, getTimeStamps(new List<DateTime>{timesByUser.get(userInfo.getUserId())})[0]);
+
+        return wrap;
     }
 
     public class MessageWrapper{
         @AuraEnabled
         public String message;
         @AuraEnabled
-        public String timestamp;
-        @AuraEnabled
         public String senderId;
         @AuraEnabled
         public String senderName;
+        @AuraEnabled
+        public String timestamp;
+        @AuraEnabled
+        public string cls;
 
-        public MessageWrapper(String m, String t, String i, String n){
+        public MessageWrapper(String m, String i, String n, String t){
             message = m;
             timestamp = t;
             senderId = i;

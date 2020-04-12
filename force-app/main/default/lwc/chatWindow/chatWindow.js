@@ -2,8 +2,8 @@ import { LightningElement, api, track, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent'
 import sendMessage from '@salesforce/apex/SendMessageHandler.sendMessage';
 import decryptMessage from '@salesforce/apex/SendMessageHandler.decryptMessage';
-import getTimeStampForRecipient from '@salesforce/apex/SendMessageHandler.getTimeStampForRecipient';
 import getChatHistory from '@salesforce/apex/SendMessageHandler.getChatHistory';
+import shareContent from '@salesforce/apex/SendMessageHandler.shareContent';
 
 export default class ChatWindow extends LightningElement {
     @api recipientName;
@@ -12,26 +12,51 @@ export default class ChatWindow extends LightningElement {
     @api userId;
     @track currentThread;
     @track chatText = [];
-    response;
+    //response;
     @track mute = false;
     @track muteIcon = "utility:volume_off";
-
+    @track windowHeight;
+    @track showUploadModal = false;
+    @track showFullHistoryModal = false;
+    @track loading = false;
+    
+    /*
+        connectedCallback
+        Execute as soon as the component renders, to pull in the chat history with this user
+    */
     connectedCallback(){
-        this.getChatHistory();
+        this.getChatHistory(50);
     }
 
+    /*
+        handleKeyPress
+        Capture when a user presses enter, in order to send the message
+    */
     handleKeyPress(event){
         if(event.code === 'Enter'){
-            this.sendMessage(event.target.value);
+            var trimmedString = event.target.value.substring(0, event.target.value.length - 11); //Remove <p><br></p> from the string to be sent, added by the last 'Enter' keypress
+            this.sendMessage(trimmedString);
             this.template.querySelector("lightning-input-rich-text").value = '';
         }
     }
 
-    getChatHistory() {
-        getChatHistory({ user1: this.userId, user2: this.recipientId, days:7 })
+    loadFullChatHistory(){
+        this.toggleFullHistory();
+        this.getChatHistory(50000);
+    }
+
+    /*
+        getChatHistory
+        Call Apex method to pull in the chat history with this particular user
+        Not able to use @wire, due to the complexities around timezones, handled in Apex
+    */
+    getChatHistory(recordLimit) {
+        this.loading = true;
+        getChatHistory({ user1: this.userId, user2: this.recipientId, lim: recordLimit})
             .then(result => {
-                console.log(result);
-                this.displayMessage(result);
+                this.chatText = [];
+                this.displayMessage(result); 
+
                 this.error = undefined;
             })
             .catch(error => {
@@ -39,48 +64,66 @@ export default class ChatWindow extends LightningElement {
             });
     }
 
-    //History messages are missing the sender name!
+    /*
+        displayMessage
+        Handles the displaying of messages on screen. Loops through a list of message contents
+        and extracts relevant info. Applies CSS styling, depending on who sent the message
+        Adds messages to the chatText array and then scrolls to the bottom of the div
+    */
     displayMessage(allMessageContents){
-        console.log('Displaying the following message: ' + allMessageContents);
         allMessageContents.forEach(msg => {
-            console.log(msg);
+            console.log('Progressing?');
+            console.log(this.isProgressing);
             var cls = '';
-            console.log(msg.senderId);
             if(msg.senderId == this.userId){
                 cls = 'my-message both-message slds-float_right';
             }else{
-                console.log('left');
                 cls = 'their-message both-message slds-float_left';
             }
             this.chatText.push({text: msg.message, senderName: msg.senderName, timestamp: msg.timestamp, class: cls});
-            //Scroll to the bottom of the div, waiting for the div to actually contain the chat first
-            this.delayTimeout = setTimeout(() => {
-                this.scrollToBottom();
-            }, 100);
         });
-        this.scrollToBottom;
+        //Scroll to the bottom of the div, waiting for the div to actually contain the chat first
+        this.delayTimeout = setTimeout(() => {
+            this.scrollToBottom();
+        }, 100);
+        this.loading = false;
     }
 
-    //Scroll to the bottom of the chat window.
+    /*
+        scrollToBottom
+        Scrolls to the bottom of the chat window div
+    */
     scrollToBottom(){
-        var objDiv = this.template.querySelector('.slds-scrollable');
-        objDiv.scrollTop = objDiv.scrollHeight;
+        console.log('scrolling down');
+        var winheight = this.template.querySelector('.slds-p-around_small').scrollHeight;
+        this.template.querySelector('.slds-p-around_small').scrollTop=winheight;
     }
 
+    /*
+
+    */
+    scrollToTop(){
+        console.log('scrolling up');
+        console.log(this.template.querySelector('.slds-p-around_small').scrollHeight);
+        this.template.querySelector('.slds-p-around_small').scrollTop=0;
+
+    }
+
+    /*
+        decryptMessage
+        Called by parent component, messenger.
+        Passes the inbound encrypted text String and passes to Apex to be decrypted
+        Apex applies timestamps and returns decrypted message for output to screen.
+        Prompts user with toast, if user hasn't muted notifications
+    */
     @api
-    decryptMessage(message, sender, recip, msgTime) {
+    decryptMessage(message, sender, fromName) {
         decryptMessage({ msg: message, snd: sender })
             .then(result => {
-                if(this.userId == sender){
-                    console.log('This is the sender');
-                    var fullMessage = [{message: result, senderId: sender, timestamp: msgTime}];
-                    console.log('This is the message: ' + fullMessage);
+                    var fullMessage = [{message: result.message, senderName: fromName, senderId: sender, timestamp: result.timestamp}];
                     this.displayMessage(fullMessage);
-                }else{    
-                    this.getTimeStampForRecipient(msgTime, sender, result);
-                }
                 if(!this.mute && sender != this.userId){
-                    this.showToast(result);
+                    this.showToast(result.message);
                 }
                 this.error = undefined;
                 this.scrollToBottom();
@@ -90,21 +133,38 @@ export default class ChatWindow extends LightningElement {
             });
     }
 
-    @api
-    getTimeStampForRecipient(time, sender, msg) {
-        getTimeStampForRecipient({tm: time})
+    handleFileUpload(event){
+        var fileIds = [];
+        var msg = this.activeUsersName + ' sent the following file(s): \r\n';
+        event.detail.files.forEach(file => {
+            fileIds.push(file.documentId);
+            msg += file.name +': ' + window.location.origin + '/' + file.documentId + '\r\n'; 
+        });
+
+        this.shareContent(fileIds, msg);
+        //var fileMessage = [{message: msg, senderName: this.activeUsersName, senderId: this.userId, timestamp: ''}];
+        
+    }
+
+    /*
+        shareContent
+        Content being sent to the recipient will not be visible to them, as they don't have access.
+        Call to Apex to share the content with the recipient using ContentDocumentLink
+    */
+    shareContent(ids, msg){
+        shareContent({userOrGroupId: this.recipientId, documentIds: ids})
             .then(result => {
-                console.log('This is the receiver');
-                //this.chatText.push (result + ' ' + msg);
-                var fullMessage = [{message: msg, senderId: sender, timestamp: result}];
-                console.log('This is the message: ' + fullMessage);
-                this.displayMessage(fullMessage);
-            })
-            .catch(error => {
-                this.error = error;
+                console.log('done');
+                this.sendMessage(msg);
             })
     }
 
+    /*
+        showToast
+        Strips the message of any HTML tags that are included within the rich text output
+        Fires toast to user with stripped contents.
+        //TODO: Fire toast when window pops open due to inbound message
+    */
     showToast(msg) {
         var strippedMsg = msg.replace(/(<([^>]+)>)/ig,"");
         const event = new ShowToastEvent({
@@ -114,18 +174,36 @@ export default class ChatWindow extends LightningElement {
         this.dispatchEvent(event);
     }
 
+    /*
+        sendMessage
+        Passes all relevant information to the Apex method to handle the sending of the message via a platform event
+    */
     sendMessage(message) {       
         sendMessage({ message: message, thread: this.currentThread, recipientId: this.recipientId, senderId: this.userId, name: this.activeUsersName })
             .then(result => {
-                this.response = result;
-                this.error = undefined;
+                var response = result;
             })
             .catch(error => {
-                this.error = error;
-                this.contacts = undefined;
+                var error = error;
             });
     }
 
+    toggleUploadModal(){
+        this.showUploadModal = !this.showUploadModal;
+    }
+
+    toggleFullHistory(){
+        console.log('toggling');
+        console.log(this.showFullHistoryModal);
+        this.showFullHistoryModal = !this.showFullHistoryModal;
+        console.log(this.showFullHistoryModal);
+    }
+
+    /*
+        toggleMute
+        Mutes and unmutes the notifications (toasts)
+        Changes the button icon to reflect mute status
+    */
     toggleMute(){
         if(this.mute){
             this.mute = false;
@@ -136,16 +214,14 @@ export default class ChatWindow extends LightningElement {
         }
     }
 
-    toggleFocus(event){
-        this.template.querySelector('.focus-thread').classList.remove('focus-thread');
-        event.currentTarget.classList.add('focus-thread');
-        this.currentThread = event.currentTarget.id;
+    /*
+        closeWindow
+        Fire an event to parent to get the current widnow to close
+    */
+    closeWindow(){
+        const selectEvent = new CustomEvent('close', {
+            detail: { recipientId: this.recipientId }
+        });
+        this.dispatchEvent(selectEvent);
     }
-
-        /*@track threadList = [{Id:'001',Name:'Thread 1'},
-        {
-            Id:'002',
-            Name:'Thread 2'
-        }
-    ];*/
 }

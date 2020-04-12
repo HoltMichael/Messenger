@@ -1,5 +1,6 @@
 import { LightningElement, track, wire } from 'lwc';
 import { getRecord } from 'lightning/uiRecordApi';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent'
 import { subscribe, unsubscribe, onError, setDebugFlag, isEmpEnabled } from 'lightning/empApi';
 import Id from '@salesforce/user/Id'; 
 
@@ -14,26 +15,56 @@ export default class Messenger extends LightningElement {
     @track isUnsubscribeDisabled = !this.isSubscribeDisabled;
     latestMessage;
 
-    //Move the focus into the newly created window
-    //If the message is incoming, immediately move the focus out (Don't want to jump tab without the user's action)
-    //This prevents the tab from lazy loading and causing future messages to be missed
+    /*
+        Move the focus into the newly created window
+        If the message is incoming, immediately move the focus out (Don't want to jump tab without the user's action)
+        This prevents the tab from lazy loading and causing future messages to be missed
+    */
     constructor() {
         super();   
         this.addEventListener('windowChange', this.handleWindowChange.bind(this));
     }
+    
     handleWindowChange(event) {
+        console.log('called');
         this.callFuncAfterTimer(this.setActiveTab, this.selectedChatId, 10);
         if(!event.detail.focus()){
             this.callFuncAfterTimer(this.setActiveTab,'Home', 10);
+            this.showFirstToast();
             //We need to re-send the message to the child, once it's been created. Since it didn't exist before. 
             //Make sure this is also delayed, since it needs to land after all historical messages are pulled out of the DB.
-            //this.callFuncAfterTimer(this.passMessagetoChild, null, 500); TODO: Come back and sort this stuff out!
+            //this.callFuncAfterTimer(this.passMessagetoChild, null, 500); //TODO: Delete this and provide a proper description for the function
         }
+    }
+
+    /*
+        showFirstToast
+        Show the toast for the first message inside a chat window. Not using the inner component toast function
+        As calling this needs to be done after the component exists and needs to decrypt the message. Firing an
+        informative toast here is quicker.
+    */
+    showFirstToast(){
+        const event = new ShowToastEvent({
+            title: this.selectedChatName,
+            message: 'New Message!',
+        });
+        this.dispatchEvent(event);
     }
 
     //Subscribe to the Platform Event as soon as the component renders
     connectedCallback(){
         this.handleSubscribe();
+    }
+
+    /*
+        handleWindowClose
+        Handles the incoming event from the chatWindow component
+        Identifies the position of the current window and removes it from the array, closing the tab
+    */
+    handleWindowClose(event){
+        console.log(event.detail.recipientId);
+        var indexOfWindow = this.getChatWindowIndex(event.detail.recipientId);
+        this.chatWindows.splice(indexOfWindow, 1);
     }
 
     // Handles subscribe to PE
@@ -42,33 +73,21 @@ export default class Messenger extends LightningElement {
         console.log('Received..');
         const messageCallback = (response) => {
             console.log('message received..');
-            var windowOpen = false;
             this.latestMessage = {
                 msg: response.data.payload.MHolt__Content__c,
                 sender: response.data.payload.MHolt__From_User__c,
                 recip: response.data.payload.MHolt__To_User__c,
-                fromName: response.data.payload.MHolt__From_Name__c,
-                msgTime1: response.data.payload.MHolt__Timestamp__c,
+                fromName: response.data.payload.MHolt__From_Name__c
             }
-            console.log('timestamps:');
             
             const allChats = this.template.querySelectorAll('c-chat-window');      
-            
-            allChats.forEach(thisChat => {
-                if(thisChat.recipientId == this.latestMessage.sender || (this.latestMessage.sender == this.userId && this.latestMessage.recip == thisChat.recipientId)){
-                    windowOpen = true;
-                }
-            });      
-
-            if(!windowOpen){
+            //If the window isn't already open and it wasn't this user that sent the message, open a chat window for the inbound message sender
+            if(this.getChatWindowIndex(this.latestMessage.sender) == -1 && this.latestMessage.sender != this.userId){
                 this.selectedChatId = this.latestMessage.sender;
                 this.selectedChatName = this.latestMessage.fromName;
                 this.createChatWindow(false);
             }  
-            
-            console.log('Passing message..');
             this.passMessagetoChild(this);
-            //this.callFuncAfterTimer(this.passMessagetoChild(), null, 1000);
         };
 
         // Invoke subscribe method of empApi. Pass reference to messageCallback
@@ -77,6 +96,11 @@ export default class Messenger extends LightningElement {
             console.log('Successfully subscribed to : ', JSON.stringify(response.channel));
             this.subscription = response;
         });
+    }
+
+    getChatWindowIndex(windowId){
+        var windowFilter = (element) => element.key == windowId;
+        return this.chatWindows.findIndex(windowFilter);
     }
 
     registerErrorListener() {
@@ -114,25 +138,34 @@ export default class Messenger extends LightningElement {
         } 
     }
 
-    //Set the properties on this component to the selected chat window
+    /*
+        handleSelect
+        Handle the select event from the userSearch component.
+        Determine whether the selected chat window is already open. If it is, give it focus
+        If the window is not open, set the relevant properties on this component and then create the window
+    */
     handleSelect(event) {
-        this.selectedChatId = event.detail.userId();
-        this.selectedChatName = event.detail.userName();
-        console.log('Opening window with this user ID: ' + this.selectedChatId);
-        this.createChatWindow(true);
+        var indexOfWindow = this.getChatWindowIndex(event.detail.userId());
+        if(indexOfWindow == -1){
+            this.selectedChatId = event.detail.userId();
+            this.selectedChatName = event.detail.userName();
+            this.createChatWindow(true);
+        }else{
+            this.setActiveTab(this, event.detail.userId());
+        }
     }
 
     //Create a new chat window in the chat window array
     //Publish an event to get picked up by this component, in order to move the focus into the window
     createChatWindow(focusWindow){
-        var chatWindow = {recipientId: this.selectedChatId, recipientName: this.selectedChatName};
+        //var chatWindow = {recipientId: this.selectedChatId, recipientName: this.selectedChatName};
         this.chatWindows.push({key: this.selectedChatId, value: this.selectedChatName});
-        
-        const selectEvent = new CustomEvent('windowChange', {
-            detail: {focus: () => focusWindow ,bubbles: true}
-        });
-        this.dispatchEvent(selectEvent);
-
+        //if(focusWindow){
+            const selectEvent = new CustomEvent('windowChange', {
+                detail: {focus: () => focusWindow ,bubbles: true}
+            });
+            this.dispatchEvent(selectEvent);
+        //}
     }
 
     callFuncAfterTimer(func, param, delay) {
@@ -141,11 +174,14 @@ export default class Messenger extends LightningElement {
         }, delay);
     }
 
+    /*
+        Find the correct chat window and ping the message off
+    */
     passMessagetoChild(self){
         var allChats = self.template.querySelectorAll('c-chat-window');    
         allChats.forEach(thisChat => {
             if(thisChat.recipientId == self.latestMessage.sender || (self.latestMessage.sender == self.userId && self.latestMessage.recip == thisChat.recipientId)){
-                thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.recip, self.latestMessage.msgTime1);
+                thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.fromName);
             }
         });
     }

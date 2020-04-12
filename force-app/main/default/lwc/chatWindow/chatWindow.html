@@ -1,13 +1,21 @@
 <template>
-    <div class="scroller">
-        <lightning-button-icon icon-name="utility:end_chat"  alternative-text="End Chat" title="End Chat"></lightning-button-icon>
-        <lightning-button-icon icon-name={muteIcon} onclick={toggleMute}  alternative-text="Notifications Off" title="Notifications Off"></lightning-button-icon>
-        <div class="slds-grid slds-grid_vertical slds-p-around_small">
-            <!--<lightning-button class="slds-p-bottom_small" label="New Thread" ></lightning-button>-->
-            <!--<template for:each={threadList} for:item="thrd">
-                <lightning-formatted-rich-text class="focus-thread" id={thrd.Id} key={thrd.Id} onclick={toggleFocus} value={thrd.Name} ></lightning-formatted-rich-text>
-            </template>-->
-            <div class="slds-scrollable slds-p-around_small" style="height:13rem;">
+    <template if:true={loading}>
+        <div class="exampleHolder">
+            <lightning-spinner style="position:absolute; top:100px" alternative-text="Loading" size="medium"></lightning-spinner>
+        </div>
+    </template>
+    <template if:false={loading}>
+        <div class="slds-grid slds-grid_vertical">
+
+            <template if:true={showUploadModal}>
+                <c-file-upload upload-target-id={userId} onclose={toggleUploadModal} onfileupload={handleFileUpload}></c-file-upload>
+            </template>
+
+            <template if:true={showFullHistoryModal}>
+                <c-load-full-history-modal recipient-name={recipientName} onclose={toggleFullHistory} onconfirm={loadFullChatHistory}></c-load-full-history-modal>
+            </template>
+
+            <div class="slds-p-around_small chat-window-box" >
                 <template for:each={chatText} for:item="chat">
                     <div key={chat} class={chat.class}>
                         <p>
@@ -21,8 +29,18 @@
                         </p>
                     </div>
                 </template>
+                <div class="slds-col slds-size_1-of-1 text-box" style="clear: both">
+                    <div class="button-row">
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:end_chat" onclick={closeWindow}  alternative-text="End Chat" title="End Chat"></lightning-button-icon>
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:arrowup" onclick={scrollToTop}  alternative-text="Scroll to Top" title="Scroll to Top"></lightning-button-icon>
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:arrowdown" onclick={scrollToBottom}  alternative-text="Scroll to Bottom" title="Scroll to Bottom"></lightning-button-icon>
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:comments" onclick={toggleFullHistory}  alternative-text="Load Full History" title="Load Full History"></lightning-button-icon>
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name={muteIcon} onclick={toggleMute}  alternative-text="Notifications Off" title="Notifications Off"></lightning-button-icon>
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:image" onclick={toggleUploadModal}  alternative-text="Send File" title="Send File"></lightning-button-icon>
+                    </div>
+                    <lightning-input-rich-text class="slds-p-top_xx-small" disabled-categories="FORMAT_FONT, FORMAT_BODY, ALIGN_TEXT, INSERT_CONTENT, REMOVE_FORMATTING" value={currentText} onkeyup={handleKeyPress}></lightning-input-rich-text>
+                </div>
             </div>
-            <lightning-input-rich-text class="slds-p-top_xxx-small" disabled-categories="FORMAT_FONT, FORMAT_BODY, ALIGN_TEXT, INSERT_CONTENT, REMOVE_FORMATTING" value={currentText} onkeyup={handleKeyPress}></lightning-input-rich-text>
         </div>
-    </div>
+    </template>
 </template>

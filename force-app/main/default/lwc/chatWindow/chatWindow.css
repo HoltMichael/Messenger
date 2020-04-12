@@ -1,13 +1,22 @@
 .my-message {
     background-color: #9EE9A6;
     box-shadow: 2px 1px 3px 3px #ccc;
-
 }
 
 .their-message {
     background-color: #AADCF3;
     box-shadow: -2px 1px 3px 3px #ccc;
 
+}
+
+.chat-window-box{
+    overflow: auto; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    right: 0; 
+    bottom: 0; 
+    height:400px;
 }
 
 .both-message {
@@ -17,6 +26,17 @@
     clear:both;
 }
 
-.THIS .canEnter .ql-editor.slds-rich-text-area__content {
-    min-height:14rem;
+.text-box{
+    position: sticky; 
+    bottom: 0;
+}
+
+.button{
+    background: red;
+}
+
+.button-row{
+    position: sticky;
+    z-index: 1;
+    top: 0;
 }
