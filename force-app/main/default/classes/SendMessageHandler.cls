@@ -6,7 +6,6 @@ public without sharing class SendMessageHandler {
     
     @AuraEnabled
     public static string sendMessage(String message, String thread, String recipientId, String senderId, String name){ 
-        system.debug(name);
         MHolt__Chat_Message_Code__mdt cryptoKeyAsString = [SELECT id, MHolt__Key__c FROM MHolt__Chat_Message_Code__mdt WHERE MasterLabel='Key'][0];
         Blob cryptoKey = EncodingUtil.base64decode(cryptoKeyAsString.MHolt__Key__c);
         Blob encryptedData = Crypto.encryptWithManagedIV('AES256', cryptoKey, Blob.valueOf(message));
@@ -53,7 +52,6 @@ public without sharing class SendMessageHandler {
             ContentDocumentLink cdl = new ContentDocumentLink(LinkedEntityId = userOrGroupId, ShareType = 'V', ContentDocumentId=contentdocId);
             cdlsToInsert.add(cdl);
         }
-        system.debug(cdlsToInsert);
         try{
             insert cdlsToInsert;
             result = 'Success';
@@ -80,7 +78,6 @@ public without sharing class SendMessageHandler {
         Method extracts the specific time values and then adds/deducts from GMT to provide a time to the recipient in their region.
     */
     public static Map<Id, DateTime> getTimeInTimezoneForUsers(List<User> users, DateTime GMTTime){
-        system.debug('GMTTime: ' + GMTTime);
         Map<Id, DateTime> userTimes = new Map<Id, DateTime>();
         Schema.DescribeFieldResult fieldResult = User.TimeZoneSidKey.getdescribe();
         List<Schema.PicklistEntry> ple = fieldResult.getPicklistValues();
@@ -93,8 +90,6 @@ public without sharing class SendMessageHandler {
                     String offset = p.getLabel().substringBetween('T',')');
                     //give us the hour / minute offsets
                     List<String> denominationOffsets = offset.split(':');
-                    system.debug('offset: ' + offset);
-                    system.debug('denominationOffsets: ' + denominationOffsets);
                     userTime = userTime.addHours(Integer.valueOf(denominationOffsets[0]));
                     userTime = userTime.addMinutes(Integer.valueOf(denominationOffsets[1]));
                     userTimes.put(u.id, userTime);
@@ -107,7 +102,6 @@ public without sharing class SendMessageHandler {
 
     @AuraEnabled
     public static List<MessageWrapper> getChatHistory(String user1, String user2, Integer lim){
-        system.debug(lim);
         List<MessageWrapper> returnMessages = new List<MessageWrapper>();
         MHolt__Chat_Message_Code__mdt cryptoKeyAsString = [SELECT id, MHolt__Key__c FROM MHolt__Chat_Message_Code__mdt WHERE MasterLabel='Key'][0];
         Blob cryptoKey = EncodingUtil.base64decode(cryptoKeyAsString.MHolt__Key__c);
@@ -115,13 +109,12 @@ public without sharing class SendMessageHandler {
         String user2Like = '%' + user2 + '%';
         
         //Need to order DESC to get the latest messages, as we pull a maximum of 
-        List<MHolt__Chat_Message__c> chatMsgs = [SELECT name, OwnerId, Owner.Name, MHolt__From_Name__c, MHolt__Message__c, MHolt__Participants__c, createdDate
+        List<MHolt__Chat_Message__c> chatMsgs = [SELECT Id, name, OwnerId, Owner.Name, MHolt__From_Name__c, MHolt__Message__c, MHolt__Participants__c, createdDate
                                                 FROM MHolt__Chat_Message__c 
                                                 WHERE MHolt__Participants__c like :user1Like
                                                 AND MHolt__Participants__c like :user2Like
                                                 ORDER BY createdDate DESC
                                                 Limit :lim];
-        system.debug(chatMsgs);
         List<User> users = getUsersWithSidkey(new List<String>{user1, user2});
         //Loop over the list of messages backwards, as they had to be pulled out of the DB DESC
         for(Integer i = chatMsgs.size() - 1; i >= 0; i--){
@@ -131,11 +124,10 @@ public without sharing class SendMessageHandler {
             blob DbdecryptedString = Crypto.decryptWithManagedIV('AES256', cryptoKey, DBbase64EncryptedMessage);
             
             Map<Id, DateTime> timesByUser = getTimeInTimezoneForUsers(users, msg.createdDate);
-            MessageWrapper wrap = new MessageWrapper(DbdecryptedString.toString(), msg.OwnerId, msg.Owner.Name, getTimeStamps(new List<DateTime>{timesByUser.get(userinfo.getuserid())})[0]);
+            MessageWrapper wrap = new MessageWrapper(DbdecryptedString.toString(), msg.OwnerId, msg.Owner.Name, getTimeStamps(new List<DateTime>{timesByUser.get(userinfo.getuserid())})[0], msg.Id);
 
             returnMessages.add(wrap);
         }
-        system.debug('returnMessages: ' + returnMessages);
         return returnMessages;
         
     }
@@ -177,12 +169,10 @@ public without sharing class SendMessageHandler {
 
     @AuraEnabled
     public static MessageWrapper decryptMessage(String msg, String snd){
-        system.debug(msg);
         String nm = '';
         try{
             User sender = [SELECT Id, Name FROM User WHERE id =: snd][0];
             nm = sender.Name;
-            system.debug(sender);
         }catch(ListException e){
             //No sender param
         }
@@ -190,7 +180,6 @@ public without sharing class SendMessageHandler {
         Blob cryptoKey = EncodingUtil.base64decode(cryptoKeyAsString.MHolt__Key__c);
         Blob base64EncryptedMessage = EncodingUtil.base64decode(msg);
         Blob decryptedData = Crypto.decryptWithManagedIV('AES256', cryptoKey, base64EncryptedMessage);
-        system.debug(nm + ':' + decryptedData.toString());
 
         List<User> currentUser = getUsersWithSidkey(new List<String>{userInfo.getUserId()});
         Map<Id, DateTime> timesByUser = getTimeInTimezoneForUsers(currentUser, system.now());
@@ -207,21 +196,24 @@ public without sharing class SendMessageHandler {
         @AuraEnabled
         public String senderName;
         @AuraEnabled
-        public String timestamp;
+        public String messageId;
         @AuraEnabled
-        public string cls;
+        public String timestamp;
 
-        public MessageWrapper(String m, String i, String n, String t){
+
+        public MessageWrapper(String m, String i, String n, String t, String mi){
             message = m;
             timestamp = t;
             senderId = i;
             senderName = n;
+            messageId = mi;
         }
  
-        public MessageWrapper(String m, String i, String n){
+        public MessageWrapper(String m, String i, String n, String mi){
             message = m;
             senderId = i;
             senderName = n;
+            messageId = mi;
         }
 
     }

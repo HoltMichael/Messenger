@@ -1,4 +1,4 @@
-import { LightningElement, api, track, wire } from 'lwc';
+import { LightningElement, api, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent'
 import sendMessage from '@salesforce/apex/SendMessageHandler.sendMessage';
 import decryptMessage from '@salesforce/apex/SendMessageHandler.decryptMessage';
@@ -19,6 +19,7 @@ export default class ChatWindow extends LightningElement {
     @track showUploadModal = false;
     @track showFullHistoryModal = false;
     @track loading = false;
+    @track showBoxes = false;
     
     /*
         connectedCallback
@@ -40,9 +41,9 @@ export default class ChatWindow extends LightningElement {
         }
     }
 
-    loadFullChatHistory(){
+    loadFullChatHistory(event){
         this.toggleFullHistory();
-        this.getChatHistory(50000);
+        this.getChatHistory(event.detail.numRecs);
     }
 
     /*
@@ -80,7 +81,7 @@ export default class ChatWindow extends LightningElement {
             }else{
                 cls = 'their-message both-message slds-float_left';
             }
-            this.chatText.push({text: msg.message, senderName: msg.senderName, timestamp: msg.timestamp, class: cls});
+            this.chatText.push({text: msg.message, senderName: msg.senderName, timestamp: msg.timestamp, class: cls, id: msg.messageId, checked: false});
         });
         //Scroll to the bottom of the div, waiting for the div to actually contain the chat first
         this.delayTimeout = setTimeout(() => {
@@ -133,6 +134,12 @@ export default class ChatWindow extends LightningElement {
             });
     }
 
+    /*
+        handleFileUpload
+        Display message to user informing them of the file they have shared
+        Provide link to doc (would like to use file-preview but only available in Aura)
+        Call function to share file with user in Apex
+    */
     handleFileUpload(event){
         var fileIds = [];
         var msg = this.activeUsersName + ' sent the following file(s): \r\n';
@@ -188,12 +195,16 @@ export default class ChatWindow extends LightningElement {
             });
     }
 
+    toggleShowBoxes(){
+        this.showBoxes = !this.showBoxes;
+    }
+    
+
     toggleUploadModal(){
         this.showUploadModal = !this.showUploadModal;
     }
 
     toggleFullHistory(){
-        console.log('toggling');
         console.log(this.showFullHistoryModal);
         this.showFullHistoryModal = !this.showFullHistoryModal;
         console.log(this.showFullHistoryModal);
