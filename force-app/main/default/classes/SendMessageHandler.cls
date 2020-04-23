@@ -13,15 +13,17 @@ public without sharing class SendMessageHandler {
         List<User> users = getUsersWithSidkey(new List<String>{recipientId, senderId});
         MHolt__Chat_Message__c msg = new MHolt__Chat_Message__c(Name = '', MHolt__Message__c = encryptedMsg, MHolt__Participant_1__c = recipientId, MHolt__Participant_2__c = senderId);
 
-        Database.UpsertResult result = database.upsert(msg);
-        if(result.isSuccess()){
-            publishEvent(recipientId, senderId, name, encryptedMsg);
+        try{
+            database.upsert(msg);
+            publishEvent(recipientId, senderId, name, encryptedMsg, msg.id);
+        }catch(exception e){
+            return e.getMessage();
         }
-        return null;
+        return 'Success';
     }
 
-    public static void publishEvent(string recip, String sdr, String nm, String msg){
-        MHolt__Message__e evt = new MHolt__Message__e(MHolt__Content__c = msg, MHolt__From_User__c = sdr, MHolt__To_User__c = recip, MHolt__From_Name__c = nm);
+    public static void publishEvent(string recip, String sdr, String nm, String msg, String id){
+        MHolt__Message__e evt = new MHolt__Message__e(MHolt__Content__c = msg, MHolt__From_User__c = sdr, MHolt__To_User__c = recip, MHolt__From_Name__c = nm, MHolt__Message_Id__c = id);
         Database.SaveResult result = EventBus.publish(evt);
         /*// Inspect publishing result for each event
         for (Database.SaveResult sr : results) {
@@ -36,6 +38,54 @@ public without sharing class SendMessageHandler {
                 }
             }       
         }*/
+    }
+
+
+    /*
+        postToChatter
+        Take the inbound messages and post them to chatter as the user's who wrote them. This requires the permission set to be applied to
+        users, else the submission will fail. Strip out all instances of <br> and <strike> as these cause errors posting to Chatter
+    */
+    @AuraEnabled
+    public static String postToChatter(List<String> chatIds, String recordId){
+        Blob cryptoKey = getCryptoKey();
+        List<MHolt__Chat_Message__c> chatMsgs = [SELECT Id, name, OwnerId, Owner.Name, MHolt__From_Name__c, MHolt__Message__c, MHolt__Participants__c, createdDate
+                                                FROM MHolt__Chat_Message__c 
+                                                WHERE Id in : chatIds
+                                                ORDER BY createdDate ASC];
+        
+        if(chatMsgs.size() > 0){
+            try{
+                String decryptedMsg = doDecryption(chatMsgs[0].MHolt__Message__c, cryptoKey);
+                //decryptedMsg = stripCommentForChatter(decryptedMsg);
+                FeedItem firstPost = new FeedItem(createdById = chatMsgs[0].OwnerId, body = decryptedMsg, isRichText = true, parentId = recordId);
+                insert firstPost;
+                chatMsgs.remove(0);
+                List<FeedComment> comments = new List<FeedComment>();
+                for(MHolt__Chat_Message__c msg: chatMsgs){
+                    decryptedMsg = doDecryption(msg.MHolt__Message__c, cryptoKey);
+                    decryptedMsg = stripCommentForChatter(decryptedMsg);
+                    FeedComment fc = new FeedComment(createdById = msg.OwnerId, CommentBody = decryptedMsg, isRichText = true, FeedItemId = firstPost.Id);
+                    comments.add(fc);
+                }
+                insert comments;
+            }catch (exception e){
+                return e.getMessage();
+            }
+        }
+        
+        return 'Messages Successfully posted to Chatter!';
+    }
+
+    /*
+        stripCommentForChatter
+        Some HTML tags throw errors when they're posted in Chatter, here we strip them out
+    */
+    public static String stripCommentForChatter(String str){
+        str = str.replaceAll('<br>', '');
+        str = str.replaceAll('<strike>', '');
+        str = str.replaceAll('</strike>', '');
+        return str;
     }
 
 
@@ -103,8 +153,7 @@ public without sharing class SendMessageHandler {
     @AuraEnabled
     public static List<MessageWrapper> getChatHistory(String user1, String user2, Integer lim){
         List<MessageWrapper> returnMessages = new List<MessageWrapper>();
-        MHolt__Chat_Message_Code__mdt cryptoKeyAsString = [SELECT id, MHolt__Key__c FROM MHolt__Chat_Message_Code__mdt WHERE MasterLabel='Key'][0];
-        Blob cryptoKey = EncodingUtil.base64decode(cryptoKeyAsString.MHolt__Key__c);
+        Blob cryptoKey = getCryptoKey();
         String user1Like = '%' + user1 + '%';
         String user2Like = '%' + user2 + '%';
         
@@ -119,12 +168,10 @@ public without sharing class SendMessageHandler {
         //Loop over the list of messages backwards, as they had to be pulled out of the DB DESC
         for(Integer i = chatMsgs.size() - 1; i >= 0; i--){
             MHolt__Chat_Message__c msg = chatMsgs[i];
-            String DbMsg = msg.MHolt__Message__c;
-            Blob Dbbase64EncryptedMessage = EncodingUtil.base64decode(DbMsg);
-            blob DbdecryptedString = Crypto.decryptWithManagedIV('AES256', cryptoKey, DBbase64EncryptedMessage);
-            
+            String decryptedMsg = doDecryption(msg.MHolt__Message__c, cryptoKey);
+
             Map<Id, DateTime> timesByUser = getTimeInTimezoneForUsers(users, msg.createdDate);
-            MessageWrapper wrap = new MessageWrapper(DbdecryptedString.toString(), msg.OwnerId, msg.Owner.Name, getTimeStamps(new List<DateTime>{timesByUser.get(userinfo.getuserid())})[0], msg.Id);
+            MessageWrapper wrap = new MessageWrapper(decryptedMsg, msg.OwnerId, msg.Owner.Name, getTimeStamps(new List<DateTime>{timesByUser.get(userinfo.getuserid())})[0], msg.Id);
 
             returnMessages.add(wrap);
         }
@@ -176,16 +223,24 @@ public without sharing class SendMessageHandler {
         }catch(ListException e){
             //No sender param
         }
-        MHolt__Chat_Message_Code__mdt cryptoKeyAsString = [SELECT id, MHolt__Key__c FROM MHolt__Chat_Message_Code__mdt WHERE MasterLabel='Key'][0];
-        Blob cryptoKey = EncodingUtil.base64decode(cryptoKeyAsString.MHolt__Key__c);
-        Blob base64EncryptedMessage = EncodingUtil.base64decode(msg);
-        Blob decryptedData = Crypto.decryptWithManagedIV('AES256', cryptoKey, base64EncryptedMessage);
+        String decryptedMsg = doDecryption(msg, getCryptoKey());
 
         List<User> currentUser = getUsersWithSidkey(new List<String>{userInfo.getUserId()});
         Map<Id, DateTime> timesByUser = getTimeInTimezoneForUsers(currentUser, system.now());
-        MessageWrapper wrap = new MessageWrapper(decryptedData.toString(), null, null, getTimeStamps(new List<DateTime>{timesByUser.get(userInfo.getUserId())})[0]);
+        MessageWrapper wrap = new MessageWrapper(decryptedMsg, getTimeStamps(new List<DateTime>{timesByUser.get(userInfo.getUserId())})[0]);
 
         return wrap;
+    }
+
+    public static Blob getCryptoKey(){
+        MHolt__Chat_Message_Code__mdt cryptoKeyMetadata = [SELECT id, MHolt__Key__c FROM MHolt__Chat_Message_Code__mdt WHERE MasterLabel='Key'][0];
+        return EncodingUtil.base64decode(cryptoKeyMetadata.MHolt__Key__c);
+    }
+
+    public static String doDecryption(String encryptedData, Blob cryptoKey){
+        Blob base64EncryptedMessage = EncodingUtil.base64decode(encryptedData);
+        Blob decryptedData = Crypto.decryptWithManagedIV('AES256', cryptoKey, base64EncryptedMessage);
+        return decryptedData.toString();
     }
 
     public class MessageWrapper{
@@ -200,7 +255,6 @@ public without sharing class SendMessageHandler {
         @AuraEnabled
         public String timestamp;
 
-
         public MessageWrapper(String m, String i, String n, String t, String mi){
             message = m;
             timestamp = t;
@@ -214,6 +268,11 @@ public without sharing class SendMessageHandler {
             senderId = i;
             senderName = n;
             messageId = mi;
+        }
+
+        public MessageWrapper(String m, String t){
+            message = m;
+            timestamp = t;
         }
 
     }

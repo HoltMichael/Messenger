@@ -3,8 +3,8 @@
         <lightning-spinner alternative-text="Loading" size="small"></lightning-spinner>
     </template>
     <template if:true={loaded}>
-        <div class="slds-grid slds-border_top slds-border_bottom slds-border_left slds-border_right chatter-box ">
-            <div class="slds-col slds-size_1-of-3 slds-p-left_x-small">
+        <div class="slds-grid slds-p-around_x-small slds-wrap slds-border_top slds-border_bottom slds-border_left slds-border_right chatter-box ">
+            <div class="slds-col slds-size_1-of-3">
                 <lightning-combobox
                             name="Object"
                             value={value}
@@ -14,8 +14,8 @@
             </div>
             <div class="slds-col slds-size_2-of-3">
                 <template if:false={selectedRecord}>
-                    <div class="slds-p-around_x-small">
-                        <c-record-search onchange={handleOnchange}></c-record-search>
+                    <div class="slds-p-left_x-small slds-p-top_x-small">
+                        <c-record-search object-not-selected={objectNotSelected} onchange={handleOnchange} ></c-record-search>
                     </div>
                 </template>
                 <div >
@@ -41,9 +41,9 @@
                     <template if:false={selectedRecord}>
                     </template>
                 </div>
-                <div class="slds-p-around_x-small">
+                <div class="slds-p-left_x-small slds-p-top_x-small">
                     <template if:true={selectedRecord}>
-                        <div class="slds-combobox__form-element slds-input-has-icon slds-input-has-icon_left-right" role="none">
+                        <div class="slds-m-top_small slds-combobox__form-element slds-input-has-icon slds-input-has-icon_left-right" role="none">
                             <span class="slds-icon_container slds-icon-standard-account slds-combobox__input-entity-icon" title="Account">
                                 <lightning-icon icon-name={iconname} ></lightning-icon>
                             </span>
@@ -57,11 +57,18 @@
                             <button class="sicon_container slds-button slds-button_icon slds-input__icon slds-input__icon_right" 
                                     title="Remove selected option"
                                     onclick={handleRemove}>
-                                <lightning-icon icon-name="utility:close" size="small"></lightning-icon>
-                                <span class="slds-assistive-text">Remove selected option</span>
+                                    X
                             </button>
                         </div>
                     </template>
+                </div>
+            </div>
+            <div class="slds-col slds-size_1-of-1 ">
+                Click on messages to select them. 
+                <lightning-helptext content="Use the search tools above to identify a record to which this Chatter post will be associated. 
+                Clicking messages in your conversation will select them for posting. The messages will be sent to your chat recipient for verification, prior to posting."></lightning-helptext>
+                <div class="slds-align_absolute-center">
+                    <lightning-button onclick={handlePopup} variant="brand" label="Post to Chatter!" title="Clicking here will send selected messages to your recipient for confirmation"></lightning-button> 
                 </div>
             </div>
         </div>

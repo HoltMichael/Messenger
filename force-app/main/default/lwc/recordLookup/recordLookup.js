@@ -8,6 +8,8 @@ export default class recordLookup extends LightningElement {
     @track objects = [];
     @track value;
     @track loaded = false;
+    @track objectNotSelected = true;
+    @track confirmed = false;
     @api index;
     @api iconname = "standard:account";
     @api objectName;
@@ -28,34 +30,36 @@ export default class recordLookup extends LightningElement {
 
     handleObjectSelect(event){
         this.objectName=event.detail.value;
+        this.objectNotSelected = false;
+    }
+
+    handlePopup(){
+        this.dispatchEvent(new CustomEvent('popup'));
     }
 
     handleOnchange(event){
-        //event.preventDefault();
         const searchKey = event.detail.value;
-        //this.records = null;
-        /* eslint-disable no-console */
-        //console.log(searchKey);
-
-        /* Call the Salesforce Apex class method to find the Records */
-        findRecords({
-            searchKey : searchKey, 
-            objectName : this.objectName, 
-            searchField : this.searchfield
-        })
-        .then(result => {
-            this.records = result;
-            for(let i=0; i < this.records.length; i++){
-                const rec = this.records[i];
-                this.records[i].Name = rec[this.searchfield];
-            }
-            this.error = undefined;
-            //console.log(' records ', this.records);
-        })
-        .catch(error => {
-            this.error = error;
-            this.records = undefined;
-        });
+        if(searchKey != ''){
+            /* Call the Salesforce Apex class method to find the Records */
+            findRecords({
+                searchKey : searchKey, 
+                objectName : this.objectName, 
+                searchField : this.searchfield
+            })
+            .then(result => {
+                this.records = result;
+                for(let i=0; i < this.records.length; i++){
+                    const rec = this.records[i];
+                    this.records[i].Name = rec[this.searchfield];
+                }
+                this.error = undefined;
+                //console.log(' records ', this.records);
+            })
+            .catch(error => {
+                this.error = error;
+                this.records = undefined;
+            });
+        }
     }
     handleSelect(event){
         const selectedRecordId = event.detail;

@@ -1,5 +1,5 @@
 <template>
     <div class="slds-grid slds-wrap slds-m-top_small">
-        <lightning-input variant="label-hidden" label="Search Record" value={searchKey} type="search" onchange={handleChange} placeholder="Record Search"></lightning-input>
+        <lightning-input disabled={objectNotSelected} variant="label-hidden" label="Search Record" value={searchKey} type="search" onchange={handleChange} placeholder="Record Search"></lightning-input>
     </div>
 </template>

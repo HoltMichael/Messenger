@@ -4,6 +4,7 @@ import sendMessage from '@salesforce/apex/SendMessageHandler.sendMessage';
 import decryptMessage from '@salesforce/apex/SendMessageHandler.decryptMessage';
 import getChatHistory from '@salesforce/apex/SendMessageHandler.getChatHistory';
 import shareContent from '@salesforce/apex/SendMessageHandler.shareContent';
+import postToChatter from '@salesforce/apex/SendMessageHandler.postToChatter';
 
 export default class ChatWindow extends LightningElement {
     @api recipientName;
@@ -11,15 +12,21 @@ export default class ChatWindow extends LightningElement {
     @api activeUsersName;
     @api userId;
     @track currentThread;
+    //chatText is an array holding information associated with each text output to the screen
     @track chatText = [];
-    //response;
+    //selectedText is an array holding those messages which have been selected to be sent to Chatter
+    @track selectedText = [];
+    //selectedRecord holds the ID of the record to post chatter messages to
+    @track selectedRecord;
     @track mute = false;
     @track muteIcon = "utility:volume_off";
     @track windowHeight;
     @track showUploadModal = false;
     @track showFullHistoryModal = false;
+    @track showChatterModal = false;
     @track loading = false;
-    @track showBoxes = false;
+    @track selectForChatter = false;
+    
     
     /*
         connectedCallback
@@ -35,12 +42,18 @@ export default class ChatWindow extends LightningElement {
     */
     handleKeyPress(event){
         if(event.code === 'Enter'){
-            var trimmedString = event.target.value.substring(0, event.target.value.length - 11); //Remove <p><br></p> from the string to be sent, added by the last 'Enter' keypress
+            let trimmedString = event.target.value.substring(0, event.target.value.length - 11); //Remove <p><br></p> from the string to be sent, added by the last 'Enter' keypress
             this.sendMessage(trimmedString);
             this.template.querySelector("lightning-input-rich-text").value = '';
         }
     }
 
+    /*
+        loadFullChatHistory
+        Closes the full chat history modal 
+        Sends a request to pull back a number of records, depending on the option selected by the user
+        Typically, this is 300 or 50,000
+    */
     loadFullChatHistory(event){
         this.toggleFullHistory();
         this.getChatHistory(event.detail.numRecs);
@@ -73,15 +86,13 @@ export default class ChatWindow extends LightningElement {
     */
     displayMessage(allMessageContents){
         allMessageContents.forEach(msg => {
-            console.log('Progressing?');
-            console.log(this.isProgressing);
             var cls = '';
             if(msg.senderId == this.userId){
                 cls = 'my-message both-message slds-float_right';
             }else{
                 cls = 'their-message both-message slds-float_left';
             }
-            this.chatText.push({text: msg.message, senderName: msg.senderName, timestamp: msg.timestamp, class: cls, id: msg.messageId, checked: false});
+            this.chatText.push({message: msg.message, senderName: msg.senderName, timestamp: msg.timestamp, cls: cls, messageId: msg.messageId});
         });
         //Scroll to the bottom of the div, waiting for the div to actually contain the chat first
         this.delayTimeout = setTimeout(() => {
@@ -91,23 +102,60 @@ export default class ChatWindow extends LightningElement {
     }
 
     /*
+        handleChatSelect
+        Adds selected chat messages to an array "SelectedText", when the user is in the "send to chatter" mini-menu
+        Removes selected chat messages from the array if they're already in it
+        Colours the messages in a slightly darker hue of green or blue
+    */
+    handleChatSelect(event){
+        if(this.selectForChatter){
+            if(event.currentTarget.classList.contains('my-message')){
+                event.currentTarget.classList.toggle('my-message-selected');
+            }else if(event.currentTarget.classList.contains('their-message')){
+                event.currentTarget.classList.toggle('their-message-selected');
+            }
+            let selectedMessage = (element) => element.messageId == event.currentTarget.dataset.targetId;
+
+            if(this.selectedText.findIndex(selectedMessage) == -1){
+                this.selectedText.push(this.chatText[this.chatText.findIndex(selectedMessage)])
+            }else{
+                this.selectedText.splice(this.selectedText.findIndex(selectedMessage),1);
+            }
+        }
+    }
+
+    /*
+        clearAllSelections
+        Clears all CSS from text boxes which indicated that they had been selected to be posted on Chatter
+        Clears the selectedText array, so no messages are selected to be posted on Chatter
+    */
+    clearAllSelections(){
+        this.selectedText = [];
+        let mySelected = this.template.querySelectorAll('.my-message-selected');
+        let theirSelected = this.template.querySelectorAll('.their-message-selected');
+        mySelected.forEach(sel => {
+            sel.classList.remove('my-message-selected');
+        });
+        theirSelected.forEach(sel => {
+            sel.classList.remove('their-message-selected');
+        });
+    }
+
+    /*
         scrollToBottom
         Scrolls to the bottom of the chat window div
     */
     scrollToBottom(){
-        console.log('scrolling down');
-        var winheight = this.template.querySelector('.slds-p-around_small').scrollHeight;
+        let winheight = this.template.querySelector('.slds-p-around_small').scrollHeight;
         this.template.querySelector('.slds-p-around_small').scrollTop=winheight;
     }
 
     /*
-
+        scrollToTop
+        Scrolls to the top of the chat window div
     */
     scrollToTop(){
-        console.log('scrolling up');
-        console.log(this.template.querySelector('.slds-p-around_small').scrollHeight);
         this.template.querySelector('.slds-p-around_small').scrollTop=0;
-
     }
 
     /*
@@ -118,10 +166,13 @@ export default class ChatWindow extends LightningElement {
         Prompts user with toast, if user hasn't muted notifications
     */
     @api
-    decryptMessage(message, sender, fromName) {
+    decryptMessage(message, sender, fromName, messageId) {
         decryptMessage({ msg: message, snd: sender })
             .then(result => {
-                    var fullMessage = [{message: result.message, senderName: fromName, senderId: sender, timestamp: result.timestamp}];
+                    console.log('decrypting..');
+                    console.log(result);
+                    let fullMessage = [{message: result.message, senderName: fromName, senderId: sender, timestamp: result.timestamp, messageId: messageId}];
+                    console.log(fullMessage);
                     this.displayMessage(fullMessage);
                 if(!this.mute && sender != this.userId){
                     this.showToast(result.message);
@@ -141,8 +192,8 @@ export default class ChatWindow extends LightningElement {
         Call function to share file with user in Apex
     */
     handleFileUpload(event){
-        var fileIds = [];
-        var msg = this.activeUsersName + ' sent the following file(s): \r\n';
+        let fileIds = [];
+        let msg = this.activeUsersName + ' sent the following file(s): \r\n';
         event.detail.files.forEach(file => {
             fileIds.push(file.documentId);
             msg += file.name +': ' + window.location.origin + '/' + file.documentId + '\r\n'; 
@@ -161,7 +212,6 @@ export default class ChatWindow extends LightningElement {
     shareContent(ids, msg){
         shareContent({userOrGroupId: this.recipientId, documentIds: ids})
             .then(result => {
-                console.log('done');
                 this.sendMessage(msg);
             })
     }
@@ -170,10 +220,9 @@ export default class ChatWindow extends LightningElement {
         showToast
         Strips the message of any HTML tags that are included within the rich text output
         Fires toast to user with stripped contents.
-        //TODO: Fire toast when window pops open due to inbound message
     */
     showToast(msg) {
-        var strippedMsg = msg.replace(/(<([^>]+)>)/ig,"");
+        let strippedMsg = msg.replace(/(<([^>]+)>)/ig,"");
         const event = new ShowToastEvent({
             title: this.recipientName,
             message: strippedMsg,
@@ -188,26 +237,70 @@ export default class ChatWindow extends LightningElement {
     sendMessage(message) {       
         sendMessage({ message: message, thread: this.currentThread, recipientId: this.recipientId, senderId: this.userId, name: this.activeUsersName })
             .then(result => {
-                var response = result;
+                if(result != 'Success'){
+                    this.showToast(result);
+                }
             })
             .catch(error => {
                 var error = error;
             });
     }
 
-    toggleShowBoxes(){
-        this.showBoxes = !this.showBoxes;
+
+    postToChatter(){
+        let chatIds = this.selectedText.map(x => x.messageId);
+        if(this.selectedRecord == null){
+            this.selectedRecord = this.userId;
+        }
+        postToChatter({chatIds: chatIds, recordId: this.selectedRecord})
+            .then(result =>{
+                this.showToast(result);
+                this.toggleSelectForChatter();
+                this.toggleChatterModal();
+            });
+    }
+
+    /*
+        handleSelectedRecord
+        Fires when child component "recordLookup" has a record selected within it
+    */
+    handleSelectedRecord(event){
+        this.selectedRecord = event.detail.recordId;
+    }
+
+    /*
+        toggleSelectForChatter
+        Displays or hides the mini-menu for selecting a record to associate a Chatter post with
+    */
+    toggleSelectForChatter(){
+        this.selectForChatter = !this.selectForChatter;
+        if(this.selectForChatter == false){
+            this.clearAllSelections();
+        }
+    }
+
+    /*
+        toggleChatterModal
+        Displays or hides the confirmation modal, which appears prior to posting on Chatter
+    */
+    toggleChatterModal(){
+        this.showChatterModal = !this.showChatterModal;
     }
     
-
+    /*
+        toggleUploadModal
+        Displays or hides the modal window for uploading files
+    */
     toggleUploadModal(){
         this.showUploadModal = !this.showUploadModal;
     }
 
+    /*
+        toggleFullHistory
+        Displays or hides the modal window which allows users to pull in many more records
+    */
     toggleFullHistory(){
-        console.log(this.showFullHistoryModal);
         this.showFullHistoryModal = !this.showFullHistoryModal;
-        console.log(this.showFullHistoryModal);
     }
 
     /*

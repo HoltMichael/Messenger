@@ -77,7 +77,8 @@ export default class Messenger extends LightningElement {
                 msg: response.data.payload.MHolt__Content__c,
                 sender: response.data.payload.MHolt__From_User__c,
                 recip: response.data.payload.MHolt__To_User__c,
-                fromName: response.data.payload.MHolt__From_Name__c
+                fromName: response.data.payload.MHolt__From_Name__c,
+                messageId: response.data.payload.MHolt__Message_Id__c
             }
             
             const allChats = this.template.querySelectorAll('c-chat-window');      
@@ -181,7 +182,7 @@ export default class Messenger extends LightningElement {
         var allChats = self.template.querySelectorAll('c-chat-window');    
         allChats.forEach(thisChat => {
             if(thisChat.recipientId == self.latestMessage.sender || (self.latestMessage.sender == self.userId && self.latestMessage.recip == thisChat.recipientId)){
-                thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.fromName);
+                thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.fromName, self.latestMessage.messageId);
             }
         });
     }

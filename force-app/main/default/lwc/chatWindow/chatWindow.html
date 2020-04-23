@@ -7,6 +7,10 @@
     <template if:false={loading}>
         <div class="slds-grid slds-grid_vertical">
 
+            <template if:true={showChatterModal}>
+                <c-confirm-chatter-post-modal messages={selectedText} recipient-name={recipientName} onsend={postToChatter} onclose={toggleChatterModal}></c-confirm-chatter-post-modal>
+            </template>
+
             <template if:true={showUploadModal}>
                 <c-file-upload upload-target-id={userId} onclose={toggleUploadModal} onfileupload={handleFileUpload}></c-file-upload>
             </template>
@@ -15,39 +19,37 @@
                 <c-load-full-history-modal recipient-name={recipientName} onclose={toggleFullHistory} onconfirm={loadFullChatHistory}></c-load-full-history-modal>
             </template>
 
+            <div class="button-row" style="z-index: 2;">
+                <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:end_chat" onclick={closeWindow}  alternative-text="End Chat" title="End Chat"></lightning-button-icon>
+                <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:arrowup" onclick={scrollToTop}  alternative-text="Scroll to Top" title="Scroll to Top"></lightning-button-icon>
+                <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:arrowdown" onclick={scrollToBottom}  alternative-text="Scroll to Bottom" title="Scroll to Bottom"></lightning-button-icon>
+                <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:comments" onclick={toggleFullHistory}  alternative-text="Load Full History" title="Load Full History"></lightning-button-icon>
+                <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name={muteIcon} onclick={toggleMute}  alternative-text="Notifications Off" title="Notifications Off"></lightning-button-icon>
+                <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:image" onclick={toggleUploadModal}  alternative-text="Send File" title="Send File"></lightning-button-icon>
+                <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="action:share_post" onclick={toggleSelectForChatter}  alternative-text="Post to Chatter" title="Post to Chatter"></lightning-button-icon>
+            </div>
+
+            <template if:true={selectForChatter}>
+                <div class="slds-m-bottom_xx-small slds-m-top_xx-small" style="z-index: 2;">
+                    <c-record-lookup onselectedrec={handleSelectedRecord} onpopup={toggleChatterModal}></c-record-lookup>
+                </div>
+            </template>
+
             <div class="slds-p-around_small chat-window-box" >
                 <template for:each={chatText} for:item="chat">
-                    <div key={chat} class={chat.class}>
-                        <template if:true={showBoxes}>
-                            <lightning-input type="checkbox"> </lightning-input>
-                        </template>
-                        <p>
+                    <div data-target-id={chat.messageId} key={chat.messageId} class={chat.cls} onclick={handleChatSelect}>
                             <lightning-formatted-rich-text style="font-size:9px; color:grey" value={chat.timestamp}></lightning-formatted-rich-text>
                         </p>
                         <p>
                             <lightning-formatted-rich-text style="font-weight: bold; color:grey" value={chat.senderName}></lightning-formatted-rich-text>
                         </p>
                         <p>
-                            <lightning-formatted-rich-text value={chat.text}></lightning-formatted-rich-text>
+                            <lightning-formatted-rich-text value={chat.message}></lightning-formatted-rich-text>
                         </p>
                     </div>
                 </template>
                 <div class="slds-col slds-size_1-of-1 text-box" style="clear: both">
-                    <template if:true={showBoxes}>
-                        <div class="slds-m-bottom_xx-small slds-scrollable">
-                            <c-record-lookup></c-record-lookup>
-                        </div>
-                    </template>
-                    <div class="button-row">
-                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:end_chat" onclick={closeWindow}  alternative-text="End Chat" title="End Chat"></lightning-button-icon>
-                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:arrowup" onclick={scrollToTop}  alternative-text="Scroll to Top" title="Scroll to Top"></lightning-button-icon>
-                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:arrowdown" onclick={scrollToBottom}  alternative-text="Scroll to Bottom" title="Scroll to Bottom"></lightning-button-icon>
-                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:comments" onclick={toggleFullHistory}  alternative-text="Load Full History" title="Load Full History"></lightning-button-icon>
-                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name={muteIcon} onclick={toggleMute}  alternative-text="Notifications Off" title="Notifications Off"></lightning-button-icon>
-                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:image" onclick={toggleUploadModal}  alternative-text="Send File" title="Send File"></lightning-button-icon>
-                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="action:share_post" onclick={toggleShowBoxes}  alternative-text="Post to Chatter" title="Post to Chatter"></lightning-button-icon>
-                    </div>
-                    <template if:false={showBoxes}>
+                    <template if:false={selectForChatter}>
                         <lightning-input-rich-text class="slds-p-top_xx-small" disabled-categories="FORMAT_FONT, FORMAT_BODY, ALIGN_TEXT, INSERT_CONTENT, REMOVE_FORMATTING" value={currentText} onkeyup={handleKeyPress}></lightning-input-rich-text>
                     </template>
                 </div>

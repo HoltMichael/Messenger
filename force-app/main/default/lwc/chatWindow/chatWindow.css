@@ -6,7 +6,14 @@
 .their-message {
     background-color: #AADCF3;
     box-shadow: -2px 1px 3px 3px #ccc;
+}
 
+.my-message-selected{
+    background-color: #54CB87;
+}
+
+.their-message-selected{
+    background-color: #28aeed;
 }
 
 .chat-window-box{
