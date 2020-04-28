@@ -1,43 +1,60 @@
+/*
+    SendMessageHandler
+    Author: Michael Holt
+    Date: 25th April 2020
+
+    Handles the sending and receiving of messages in the ChatWindow Component. 
+    Includes pulling historic messages out of the database, encrypting and decrypting data, ensuring messages 
+    are shown in the user's timezone and posting messages to Chatter, when requested.
+*/
+
 public without sharing class SendMessageHandler {
+    //monthIntegersByName Map for the easy translation of month numbers to month names
     private static Map<String, Integer> monthIntegersByName = new Map<String, Integer>
     {'Jan' => 1, 'Feb' => 2,'Mar' => 3, 'Apr' => 4, 'May' => 5, 'June' => 6, 'July' => 7, 'Aug' => 8, 'Sep' => 9, 'Oct' => 10, 'Nov' => 11, 'Dec' => 12};
+    //monthIntegersByName Map for the easy translation of month names to month numbers
     private static Map<Integer, String> monthNamesByInteger = new Map<Integer, String>
     {1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'June', 7 => 'July', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'};
-    
+
+    /*
+        sendMessage
+        Handles the encryption of the message to being sent.
+        Stores the message to be sent in the MHolt__Chat_Message__c custom object. This enables messages to be pulled back in when the component is loaded on screen
+        Calls method to send the platform event. This enables messages to be displayed on screen live, during this session.
+    */
     @AuraEnabled
-    public static string sendMessage(String message, String thread, String recipientId, String senderId, String name){ 
-        MHolt__Chat_Message_Code__mdt cryptoKeyAsString = [SELECT id, MHolt__Key__c FROM MHolt__Chat_Message_Code__mdt WHERE MasterLabel='Key'][0];
-        Blob cryptoKey = EncodingUtil.base64decode(cryptoKeyAsString.MHolt__Key__c);
+    public static string sendMessage(String message, String recipientId, String senderId, String name){ 
+        Blob cryptoKey = getCryptoKey();
         Blob encryptedData = Crypto.encryptWithManagedIV('AES256', cryptoKey, Blob.valueOf(message));
         String encryptedMsg = EncodingUtil.base64encode(encryptedData);
         List<User> users = getUsersWithSidkey(new List<String>{recipientId, senderId});
         MHolt__Chat_Message__c msg = new MHolt__Chat_Message__c(Name = '', MHolt__Message__c = encryptedMsg, MHolt__Participant_1__c = recipientId, MHolt__Participant_2__c = senderId);
 
         try{
-            database.upsert(msg);
-            publishEvent(recipientId, senderId, name, encryptedMsg, msg.id);
+            database.insert(msg);
+            //Future: return the publish errors, combined with the database errors
+            String errors = publishEvent(recipientId, senderId, name, encryptedMsg, msg.id);
         }catch(exception e){
             return e.getMessage();
         }
         return 'Success';
     }
 
-    public static void publishEvent(string recip, String sdr, String nm, String msg, String id){
+    /*
+        publishEvent
+        Publishes the platform event with the message being sent on it, so that any current subscribers see the message appear on screen.
+        Including the sender of the message
+    */
+    public static String publishEvent(string recip, String sdr, String nm, String msg, String id){
         MHolt__Message__e evt = new MHolt__Message__e(MHolt__Content__c = msg, MHolt__From_User__c = sdr, MHolt__To_User__c = recip, MHolt__From_Name__c = nm, MHolt__Message_Id__c = id);
+        String errors = '';
         Database.SaveResult result = EventBus.publish(evt);
-        /*// Inspect publishing result for each event
-        for (Database.SaveResult sr : results) {
-            if (sr.isSuccess()) {
-                System.debug('Successfully published event.');
-            } else {
-                for(Database.Error err : sr.getErrors()) {
-                    System.debug('Error returned: ' +
-                                err.getStatusCode() +
-                                ' - ' +
-                                err.getMessage());
-                }
-            }       
-        }*/
+        if (!result.isSuccess()) {
+            for(Database.Error err : result.getErrors()) {
+                errors += err.getStatusCode() + ' - ' + err.getMessage();
+            }     
+        }
+        return errors;
     }
 
 
@@ -57,7 +74,6 @@ public without sharing class SendMessageHandler {
         if(chatMsgs.size() > 0){
             try{
                 String decryptedMsg = doDecryption(chatMsgs[0].MHolt__Message__c, cryptoKey);
-                //decryptedMsg = stripCommentForChatter(decryptedMsg);
                 FeedItem firstPost = new FeedItem(createdById = chatMsgs[0].OwnerId, body = decryptedMsg, isRichText = true, parentId = recordId);
                 insert firstPost;
                 chatMsgs.remove(0);
@@ -150,6 +166,13 @@ public without sharing class SendMessageHandler {
         return userTimes;
     }
 
+    /*
+        getChatHistory
+        Called when the component loads, or when the user requests a greater number of chat messages
+        Takes the ID of both users as Strings and the number of messages to be retrieved
+        Handles getting a batch of historic messages out of the database, depending on value of lim
+        Decrypts each message and returns the messages to component as MessageWrappers in order to render them on screen
+    */
     @AuraEnabled
     public static List<MessageWrapper> getChatHistory(String user1, String user2, Integer lim){
         List<MessageWrapper> returnMessages = new List<MessageWrapper>();
@@ -157,7 +180,7 @@ public without sharing class SendMessageHandler {
         String user1Like = '%' + user1 + '%';
         String user2Like = '%' + user2 + '%';
         
-        //Need to order DESC to get the latest messages, as we pull a maximum of 
+        //Need to order DESC to get the latest messages, as we pull a maximum of lim number. Sort ASC will bring back the very oldest messages and miss the most recent
         List<MHolt__Chat_Message__c> chatMsgs = [SELECT Id, name, OwnerId, Owner.Name, MHolt__From_Name__c, MHolt__Message__c, MHolt__Participants__c, createdDate
                                                 FROM MHolt__Chat_Message__c 
                                                 WHERE MHolt__Participants__c like :user1Like
@@ -165,7 +188,7 @@ public without sharing class SendMessageHandler {
                                                 ORDER BY createdDate DESC
                                                 Limit :lim];
         List<User> users = getUsersWithSidkey(new List<String>{user1, user2});
-        //Loop over the list of messages backwards, as they had to be pulled out of the DB DESC
+        //Loop over the list of messages backwards, to sort their order, as they had to be pulled out of the DB DESC
         for(Integer i = chatMsgs.size() - 1; i >= 0; i--){
             MHolt__Chat_Message__c msg = chatMsgs[i];
             String decryptedMsg = doDecryption(msg.MHolt__Message__c, cryptoKey);
@@ -175,6 +198,7 @@ public without sharing class SendMessageHandler {
 
             returnMessages.add(wrap);
         }
+        system.debug(returnMessages);
         return returnMessages;
         
     }
@@ -214,6 +238,14 @@ public without sharing class SendMessageHandler {
         return timestamps; 
     }
 
+    /*
+        decryptMessage
+        Called when a message arrives as a platform event on the chatWindow component
+        Calls method to do the decryption of the message
+        Calls method to get the correct time zone for the user
+        Calls method to get the timestamp in the time zone of this particular user
+        Returns MessageWrapper back with the decrypted message and timezone of the user, to be displayer on screen
+    */
     @AuraEnabled
     public static MessageWrapper decryptMessage(String msg, String snd){
         String nm = '';
@@ -224,7 +256,6 @@ public without sharing class SendMessageHandler {
             //No sender param
         }
         String decryptedMsg = doDecryption(msg, getCryptoKey());
-
         List<User> currentUser = getUsersWithSidkey(new List<String>{userInfo.getUserId()});
         Map<Id, DateTime> timesByUser = getTimeInTimezoneForUsers(currentUser, system.now());
         MessageWrapper wrap = new MessageWrapper(decryptedMsg, getTimeStamps(new List<DateTime>{timesByUser.get(userInfo.getUserId())})[0]);
@@ -232,17 +263,35 @@ public without sharing class SendMessageHandler {
         return wrap;
     }
 
+    /*
+        getCryptoKey
+        Gets the crypto key specific to this org, out of the DB. 
+        Crypto key inserted as part of install script in EncryptionKeyGenerator Class
+    */
     public static Blob getCryptoKey(){
-        MHolt__Chat_Message_Code__mdt cryptoKeyMetadata = [SELECT id, MHolt__Key__c FROM MHolt__Chat_Message_Code__mdt WHERE MasterLabel='Key'][0];
-        return EncodingUtil.base64decode(cryptoKeyMetadata.MHolt__Key__c);
+        if(test.isrunningtest()){
+            String keyAsString = '71Hnt5gqRX0N5CWUMWbBwozy5H8mSzXNtPArOJUhSao=';
+            return EncodingUtil.base64decode(keyAsString);
+        }else{
+            MHolt__Chat_Message_Code__mdt cryptoKeyMetadata = [SELECT id, MHolt__Key__c FROM MHolt__Chat_Message_Code__mdt WHERE MasterLabel='Key'][0];
+            return EncodingUtil.base64decode(cryptoKeyMetadata.MHolt__Key__c);
+        }
     }
 
+    /*
+        doDecryption
+        Decrypts messages using the crypto key specific to this org.
+    */
     public static String doDecryption(String encryptedData, Blob cryptoKey){
         Blob base64EncryptedMessage = EncodingUtil.base64decode(encryptedData);
         Blob decryptedData = Crypto.decryptWithManagedIV('AES256', cryptoKey, base64EncryptedMessage);
         return decryptedData.toString();
     }
 
+    /*
+        MessageWrapper
+        Holds the data structure used when showing a particular text box in the ChatWindow component
+    */
     public class MessageWrapper{
         @AuraEnabled
         public String message;

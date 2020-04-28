@@ -44,9 +44,9 @@
                 <div class="slds-p-left_x-small slds-p-top_x-small">
                     <template if:true={selectedRecord}>
                         <div class="slds-m-top_small slds-combobox__form-element slds-input-has-icon slds-input-has-icon_left-right" role="none">
-                            <span class="slds-icon_container slds-icon-standard-account slds-combobox__input-entity-icon" title="Account">
+                            <!--<span class="slds-icon_container slds-icon-standard-account slds-combobox__input-entity-icon" title="Account">
                                 <lightning-icon icon-name={iconname} ></lightning-icon>
-                            </span>
+                            </span>-->
                             <input class="slds-input slds-combobox__input slds-combobox__input-value" 
                                 id="combobox-id-5" aria-controls="listbox-id-5" 
                                 autocomplete="off" role="textbox" type="text" 
@@ -66,7 +66,7 @@
             <div class="slds-col slds-size_1-of-1 ">
                 Click on messages to select them. 
                 <lightning-helptext content="Use the search tools above to identify a record to which this Chatter post will be associated. 
-                Clicking messages in your conversation will select them for posting. The messages will be sent to your chat recipient for verification, prior to posting."></lightning-helptext>
+                Selecting no record above will default the post to your own user profile. Clicking messages in your conversation will select them for posting."></lightning-helptext>
                 <div class="slds-align_absolute-center">
                     <lightning-button onclick={handlePopup} variant="brand" label="Post to Chatter!" title="Clicking here will send selected messages to your recipient for confirmation"></lightning-button> 
                 </div>

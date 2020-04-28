@@ -2,18 +2,48 @@ import { LightningElement, track, wire } from 'lwc';
 import { getRecord } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent'
 import { subscribe, unsubscribe, onError, setDebugFlag, isEmpEnabled } from 'lightning/empApi';
+import hasUserAndEventAccess from '@salesforce/apex/MessengerUtils.hasUserAndEventAccess';
 import Id from '@salesforce/user/Id'; 
 
 export default class Messenger extends LightningElement {
+    //Populated with the ID of the latest user who the current user wishes to chat to
     selectedChatId;
+    //Populated with the full name of the latest user who the current user wishes to chat to
     selectedChatName;
+    //Photo is not used, introduce this for a future release
+    selectedChatPhoto;
+    userId = Id;
+    //Used for storing info for the latest message that's come in
+    latestMessage;
+    //The platform event bus to subscribe to
+    channelName = '/event/MHolt__Message__e';
+    //Holds information for all of the currently open chat windows (tabs)
     @track chatWindows = [];
     @track objUser = {};
-    userId = Id;
-    @track channelName = '/event/MHolt__Message__e';
-    @track isSubscribeDisabled = false;
-    @track isUnsubscribeDisabled = !this.isSubscribeDisabled;
-    latestMessage;
+    @track access;
+    @track loading=true;
+
+    /*
+        wiredAccess
+        Check that the current user has access to the user object, to initiate a conversation with them
+        Show a loading window whilst this check happens. If the user does have access, call function to
+        subscribe to the platform event
+    */
+    @wire(hasUserAndEventAccess) 
+    wiredAccess({error, data}){
+        if(data === true){
+            this.loading = false;
+            this.access = data;
+            this.handleSubscribe();
+        }else if(data === false){
+            this.loading = false;
+            this.access = false;
+        }else if(error){
+            this.loading = true;
+            this.access = false;
+        }
+    }
+
 
     /*
         Move the focus into the newly created window
@@ -25,23 +55,27 @@ export default class Messenger extends LightningElement {
         this.addEventListener('windowChange', this.handleWindowChange.bind(this));
     }
     
+    /*
+        handleWindowChange
+        Change the focus of the user's view to the new tab. If the tab has opened as a result of a new 
+        inbound message (window that wasn't previously open), then rapidly switch back to the previous tab.
+        We need to initially jump into this tab, to ensure that it doesn't lazy load and make sure the future
+        messages are caught here.
+    */
     handleWindowChange(event) {
-        console.log('called');
         this.callFuncAfterTimer(this.setActiveTab, this.selectedChatId, 10);
         if(!event.detail.focus()){
             this.callFuncAfterTimer(this.setActiveTab,'Home', 10);
             this.showFirstToast();
-            //We need to re-send the message to the child, once it's been created. Since it didn't exist before. 
-            //Make sure this is also delayed, since it needs to land after all historical messages are pulled out of the DB.
-            //this.callFuncAfterTimer(this.passMessagetoChild, null, 500); //TODO: Delete this and provide a proper description for the function
         }
     }
 
     /*
         showFirstToast
         Show the toast for the first message inside a chat window. Not using the inner component toast function
-        As calling this needs to be done after the component exists and needs to decrypt the message. Firing an
-        informative toast here is quicker.
+        As calling this needs to be done after the component exists and needs to decrypt the message. Firing a
+        slightly less informative toast here for this first message is quicker. All future messages are handled
+        by chatWindow's fireToast function
     */
     showFirstToast(){
         const event = new ShowToastEvent({
@@ -49,11 +83,6 @@ export default class Messenger extends LightningElement {
             message: 'New Message!',
         });
         this.dispatchEvent(event);
-    }
-
-    //Subscribe to the Platform Event as soon as the component renders
-    connectedCallback(){
-        this.handleSubscribe();
     }
 
     /*
@@ -67,12 +96,15 @@ export default class Messenger extends LightningElement {
         this.chatWindows.splice(indexOfWindow, 1);
     }
 
-    // Handles subscribe to PE
+    /*
+        handleSubscribe
+        Handles the subscription to the platform event and all inbound messages.
+        Each message is set to the latestMessage var, to be used elsewhere in the component
+        and eventually sent to the Child component in the passMessagetoChild function
+    */
     handleSubscribe() {
         // Callback invoked whenever a new event message is received
-        console.log('Received..');
         const messageCallback = (response) => {
-            console.log('message received..');
             this.latestMessage = {
                 msg: response.data.payload.MHolt__Content__c,
                 sender: response.data.payload.MHolt__From_User__c,
@@ -91,36 +123,62 @@ export default class Messenger extends LightningElement {
             this.passMessagetoChild(this);
         };
 
-        // Invoke subscribe method of empApi. Pass reference to messageCallback
-        subscribe(this.channelName, -1, messageCallback).then(response => {
-            // Response contains the subscription information on successful subscribe call
-            console.log('Successfully subscribed to : ', JSON.stringify(response.channel));
-            this.subscription = response;
-        });
+        //Do not subscribe to the platform event and consume allocations if we do not
+        //have access to the object anyway
+        if(this.access){
+            // Invoke subscribe method of empApi. Pass reference to messageCallback
+            subscribe(this.channelName, -1, messageCallback).then(response => {
+                // Response contains the subscription information on successful subscribe call
+                this.subscription = response;
+            });
+        }
     }
 
+    /*
+        getChatWindowIndex    
+        Takes an ID of a chat Window/Tab (which is the Id of the user or group being chatted to)
+        Returns the index at which the particular window sits within the chatWindows array
+        Used for checking whether a chat window is already open, and for closing windows
+        by removing them from this array
+    */
     getChatWindowIndex(windowId){
         var windowFilter = (element) => element.key == windowId;
         return this.chatWindows.findIndex(windowFilter);
     }
 
+    /*
+        registerErrorListener
+        Handle if something goes wrong in the platform event subscription.
+        Calls method to show generic error.
+    */
     registerErrorListener() {
         // Invoke onError empApi method
         onError(error => {
-            console.log('Received error from server: ', JSON.stringify(error));
-            // Error contains the server-side error
+            this.showErrorToast;
+            //console.log('Received error from server: ', JSON.stringify(error));
         });
     }
 
-    registerErrorListener() {
-        // Invoke onError empApi method
-        onError(error => {
-            console.log('Received error from server: ', JSON.stringify(error));
-            // Error contains the server-side error
+    /*
+        showErrorToast
+        Show generic message that something has gone wrong with the component.
+        Used for when an error occurs with the platform event.
+    */
+    showErrorToast(){
+        const event = new ShowToastEvent({
+            title: 'Something Went Wrong!',
+            message: 'Messenger has experienced an issue and may not work as intended',
+            variant: 'error'
         });
+        this.dispatchEvent(event);
     }
+
     
-    // using wire service getting current user data
+    
+    /*
+        userData
+        Use the wire service to get current user information
+    */
     @wire(getRecord, { recordId: Id, fields: ['User.FirstName', 'User.LastName', 'User.Name', 'User.Alias', 'User.IsActive'] })
     userData({error, data}) {
         if(data) {
@@ -150,25 +208,32 @@ export default class Messenger extends LightningElement {
         if(indexOfWindow == -1){
             this.selectedChatId = event.detail.userId();
             this.selectedChatName = event.detail.userName();
+            this.selectedChatPhoto = event.detail.userPic();
             this.createChatWindow(true);
         }else{
             this.setActiveTab(this, event.detail.userId());
         }
     }
 
-    //Create a new chat window in the chat window array
-    //Publish an event to get picked up by this component, in order to move the focus into the window
+
+    /*
+        createChatWindow
+        Create a new element in the chat window array, which is rendered on screen as a tab
+        Publish an event to get picked up by this component, in order to move the focus into the window
+    */
     createChatWindow(focusWindow){
-        //var chatWindow = {recipientId: this.selectedChatId, recipientName: this.selectedChatName};
-        this.chatWindows.push({key: this.selectedChatId, value: this.selectedChatName});
-        //if(focusWindow){
-            const selectEvent = new CustomEvent('windowChange', {
-                detail: {focus: () => focusWindow ,bubbles: true}
-            });
-            this.dispatchEvent(selectEvent);
-        //}
+        this.chatWindows.push({key: this.selectedChatId, value: this.selectedChatName, photo: this.selectedChatPhoto});
+        const selectEvent = new CustomEvent('windowChange', {
+            detail: {focus: () => focusWindow ,bubbles: true}
+        });
+        this.dispatchEvent(selectEvent);
     }
 
+    /*
+        callFuncAfterTimer
+        Takes a function, 1 parameter and a delay timer
+        Calls the function, with the specified paramter, after the delay period
+    */
     callFuncAfterTimer(func, param, delay) {
         this.delayTimeout = setTimeout(() => {
             func(this, param);
@@ -176,7 +241,9 @@ export default class Messenger extends LightningElement {
     }
 
     /*
-        Find the correct chat window and ping the message off
+        passMessagetoChild    
+        Find the correct chat window and call the method to decrypt the message and 
+        render it on screen within the correct component.
     */
     passMessagetoChild(self){
         var allChats = self.template.querySelectorAll('c-chat-window');    
@@ -187,6 +254,11 @@ export default class Messenger extends LightningElement {
         });
     }
 
+    /*
+        setActiveTab    
+        Takes an object and sets a particular tab within that object to the tabId provided.
+        Typically, first parameter will be this.
+    */
     setActiveTab(self, tabId){
         self.template.querySelector('lightning-tabset').activeTabValue = tabId;
     }

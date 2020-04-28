@@ -6,16 +6,16 @@ export default class recordSearch extends LightningElement {
     @track required = false;
     @track searchKey;
     
+    /*
+        handleChange
+        Fire custom event for each keystroke for parent components to adjust records displayed
+        in custom lookup component
+    */
     handleChange(event){
         const searchKey = event.target.value;
         /* eslint-disable no-console */
         event.preventDefault();
-        const searchEvent = new CustomEvent(
-            'change', 
-            { 
-                detail : searchKey
-            }
-        );
+        const searchEvent = new CustomEvent('change', { detail : searchKey });
         this.dispatchEvent(searchEvent);
     }
 }

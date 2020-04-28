@@ -12,7 +12,7 @@
                     <lightning-card title="Users" icon-name="standard:user">
                         <div class="slds-scrollable" style={userHeight}>
                             <template for:each={users.data} for:item="user">
-                                <a href="#" key={user.Id} data-user-id={user.Id} data-user-name={user.Name} onclick={handleSelect}>
+                                <a href="#" key={user.Id} data-user-id={user.Id} data-user-name={user.Name} data-user-pic={user.FullPhotoUrl} onclick={handleSelect}>
                                     <lightning-layout class="slds-p-left_medium">
                                         <lightning-layout-item>
                                             <img src={user.FullPhotoUrl} style="height:1rem;width:1rem" alt="Profile photo" />
@@ -32,7 +32,7 @@
                 <lightning-card title="Groups" icon-name="standard:groups">
                     <div class="slds-scrollable" style={groupHeight}>
                         <template for:each={groups.data} for:item="group">
-                            <a href="#" key={group.Id} data-user-id={group.Id} data-user-name={group.Name} onclick={handleSelect}>
+                            <a href="#" key={group.Id} data-user-id={group.Id} data-user-name={group.Name} data-user-pic="group" onclick={handleSelect}>
                                 <lightning-layout class="slds-p-left_small">
                                     <lightning-layout-item class="slds-p-left_small">
                                         <p>{group.Name}</p>

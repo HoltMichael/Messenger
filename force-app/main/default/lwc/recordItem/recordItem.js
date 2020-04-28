@@ -5,6 +5,11 @@ export default class RecordList extends LightningElement {
     @api fieldname;
     @api iconname;
 
+    /*
+        handleSelect
+        Fire event to parent component noting which record has 
+        been selected from this custom lookup component
+    */
     handleSelect(event){
         event.preventDefault();
         const selectedRecord = new CustomEvent(
@@ -13,9 +18,6 @@ export default class RecordList extends LightningElement {
                 detail : this.record.Id
             }
         );
-        /* eslint-disable no-console */
-        //console.log( this.record.Id);
-        /* fire the event to be handled on the Parent Component */
         this.dispatchEvent(selectedRecord);
     }
 }

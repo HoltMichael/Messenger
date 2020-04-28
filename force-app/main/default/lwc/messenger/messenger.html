@@ -1,14 +1,26 @@
 <template>
     <div class="slds-grid slds-grid_vertical slds-p-around_small">
-        <lightning-tabset>
-            <lightning-tab label="Home" value="Home">
-                <c-user-search style="position: static" onselect={handleSelect}></c-user-search>
-            </lightning-tab>
-            <template for:each={chatWindows} for:item="window">
-                <lightning-tab key={window.key} value={window.key} end-icon-name="standard:rtc_presence" label={window.value}>
-                    <c-chat-window onclose={handleWindowClose} user-id={userId} active-users-name={objUser.Name} recipient-name={window.value} recipient-id={window.key}></c-chat-window>
-                </lightning-tab>
+        <template if:false={loading}>
+            <template if:true={access}>
+                <lightning-tabset>
+                    <lightning-tab label="Home" value="Home">
+                        <c-user-search style="position: static" onselect={handleSelect}></c-user-search>
+                    </lightning-tab>
+                    <template for:each={chatWindows} for:item="window">
+                        <lightning-tab key={window.key} value={window.key} end-icon-name="standard:rtc_presence" label={window.value}>
+                            <c-chat-window onclose={handleWindowClose} user-id={userId} active-users-name={objUser.Name} recipient-name={window.value} recipient-id={window.key}></c-chat-window>
+                        </lightning-tab>
+                    </template>
+                </lightning-tabset>
             </template>
-        </lightning-tabset>
+            <template if:false={access}>
+                Insufficient Messenger Access, likely a permission set issue. Please consult with your system administrator
+            </template>
+        </template>
+        <template if:true={loading}>
+            <div>
+                <lightning-spinner style="position:absolute; top:100px" alternative-text="Loading" size="medium"></lightning-spinner>
+            </div>
+        </template>
     </div>
 </template>

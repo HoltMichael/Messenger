@@ -1,8 +1,16 @@
+/*
+    EncryptionKeyGenerator
+    Author: Michael Holt
+    Date: 25th April 2020
+
+    On install into a Salesforce instance, generated a crypto key specific to this particular org
+    That is used for the process of all encrypting and decrypting of messages when sent using the Messenger app.
+*/
+
 public with sharing class EncryptionKeyGenerator {
     public static void onInstall(InstallContext context) {
         Blob cryptoKey = Crypto.generateAesKey(256);
         String cryptoKeyAsString = EncodingUtil.base64encode(cryptoKey);
-
 
         try{
             Metadata.CustomMetadata customMetadata =  new Metadata.CustomMetadata();

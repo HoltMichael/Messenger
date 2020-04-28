@@ -11,16 +11,17 @@ export default class ChatWindow extends LightningElement {
     @api recipientId;
     @api activeUsersName;
     @api userId;
-    @track currentThread;
+    //Future: Introduce threads within chats.
+    //@track currentThread;
     //chatText is an array holding information associated with each text output to the screen
     @track chatText = [];
     //selectedText is an array holding those messages which have been selected to be sent to Chatter
     @track selectedText = [];
     //selectedRecord holds the ID of the record to post chatter messages to
     @track selectedRecord;
-    @track mute = false;
-    @track muteIcon = "utility:volume_off";
     @track windowHeight;
+    @track muteIcon = "utility:volume_off";
+    @track mute = false;
     @track showUploadModal = false;
     @track showFullHistoryModal = false;
     @track showChatterModal = false;
@@ -33,7 +34,9 @@ export default class ChatWindow extends LightningElement {
         Execute as soon as the component renders, to pull in the chat history with this user
     */
     connectedCallback(){
+        console.log('Callback');
         this.getChatHistory(50);
+        console.log('finished callback');
     }
 
     /*
@@ -66,9 +69,12 @@ export default class ChatWindow extends LightningElement {
     */
     getChatHistory(recordLimit) {
         this.loading = true;
+        console.log('here');
         getChatHistory({ user1: this.userId, user2: this.recipientId, lim: recordLimit})
             .then(result => {
+                console.log('getting');
                 this.chatText = [];
+                console.log(result);
                 this.displayMessage(result); 
 
                 this.error = undefined;
@@ -85,6 +91,7 @@ export default class ChatWindow extends LightningElement {
         Adds messages to the chatText array and then scrolls to the bottom of the div
     */
     displayMessage(allMessageContents){
+        console.log('display message');
         allMessageContents.forEach(msg => {
             var cls = '';
             if(msg.senderId == this.userId){
@@ -235,7 +242,7 @@ export default class ChatWindow extends LightningElement {
         Passes all relevant information to the Apex method to handle the sending of the message via a platform event
     */
     sendMessage(message) {       
-        sendMessage({ message: message, thread: this.currentThread, recipientId: this.recipientId, senderId: this.userId, name: this.activeUsersName })
+        sendMessage({ message: message, recipientId: this.recipientId, senderId: this.userId, name: this.activeUsersName })
             .then(result => {
                 if(result != 'Success'){
                     this.showToast(result);
@@ -247,6 +254,12 @@ export default class ChatWindow extends LightningElement {
     }
 
 
+    /*
+        postToChatter
+        Get all of the IDs of all of the messages to be posted to Chatter
+        Pass all messages to Apex, Apex handles the posting of the messages
+        in the context of the user who sent the message.
+    */
     postToChatter(){
         let chatIds = this.selectedText.map(x => x.messageId);
         if(this.selectedRecord == null){
