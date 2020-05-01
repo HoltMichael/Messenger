@@ -5,6 +5,8 @@ import decryptMessage from '@salesforce/apex/SendMessageHandler.decryptMessage';
 import getChatHistory from '@salesforce/apex/SendMessageHandler.getChatHistory';
 import shareContent from '@salesforce/apex/SendMessageHandler.shareContent';
 import postToChatter from '@salesforce/apex/SendMessageHandler.postToChatter';
+import setChatRead from '@salesforce/apex/SendMessageHandler.setChatRead';
+import FORM_FACTOR from '@salesforce/client/formFactor';
 
 export default class ChatWindow extends LightningElement {
     @api recipientName;
@@ -27,6 +29,9 @@ export default class ChatWindow extends LightningElement {
     @track showChatterModal = false;
     @track loading = false;
     @track selectForChatter = false;
+    @track menuShrunk = false
+    formFactor = FORM_FACTOR;
+    isSmall = (this.formFactor == 'Small');
     
     
     /*
@@ -34,9 +39,8 @@ export default class ChatWindow extends LightningElement {
         Execute as soon as the component renders, to pull in the chat history with this user
     */
     connectedCallback(){
-        console.log('Callback');
         this.getChatHistory(50);
-        console.log('finished callback');
+        this.setChatRead();
     }
 
     /*
@@ -49,6 +53,32 @@ export default class ChatWindow extends LightningElement {
             this.sendMessage(trimmedString);
             this.template.querySelector("lightning-input-rich-text").value = '';
         }
+    }
+
+    /*
+        setChatRead
+        Set the chat messages within this window as "Read"
+    */
+   setChatRead(){
+    setChatRead({userId: this.recipientId})
+        .then(result => {
+            if(result!='Success'){
+                this.showToastNoStrip('Something went wrong',result,'error');
+            }
+        })
+        .catch(error => {
+            this.showToastNoStrip('Something went wrong',error.body.message,'error');
+        })
+    }
+
+    /*
+        sendMessageForMobile
+        We have a button on the mobile app, rather than pressing enter
+        So respond to the button press instead
+    */
+    sendMessageForMobile(){
+        this.sendMessage(this.template.querySelector("lightning-input-rich-text").value);
+        this.template.querySelector("lightning-input-rich-text").value = '';
     }
 
     /*
@@ -69,18 +99,13 @@ export default class ChatWindow extends LightningElement {
     */
     getChatHistory(recordLimit) {
         this.loading = true;
-        console.log('here');
         getChatHistory({ user1: this.userId, user2: this.recipientId, lim: recordLimit})
             .then(result => {
-                console.log('getting');
                 this.chatText = [];
-                console.log(result);
                 this.displayMessage(result); 
-
-                this.error = undefined;
             })
             .catch(error => {
-                this.error = error;
+                this.showToastNoStrip('Something went wrong',error.body.message,'error');
             });
     }
 
@@ -91,7 +116,6 @@ export default class ChatWindow extends LightningElement {
         Adds messages to the chatText array and then scrolls to the bottom of the div
     */
     displayMessage(allMessageContents){
-        console.log('display message');
         allMessageContents.forEach(msg => {
             var cls = '';
             if(msg.senderId == this.userId){
@@ -153,8 +177,8 @@ export default class ChatWindow extends LightningElement {
         Scrolls to the bottom of the chat window div
     */
     scrollToBottom(){
-        let winheight = this.template.querySelector('.slds-p-around_small').scrollHeight;
-        this.template.querySelector('.slds-p-around_small').scrollTop=winheight;
+        let winheight = this.template.querySelector('.slds-p-around_xxx-small').scrollHeight;
+        this.template.querySelector('.slds-p-around_xxx-small').scrollTop=winheight;
     }
 
     /*
@@ -162,7 +186,7 @@ export default class ChatWindow extends LightningElement {
         Scrolls to the top of the chat window div
     */
     scrollToTop(){
-        this.template.querySelector('.slds-p-around_small').scrollTop=0;
+        this.template.querySelector('.slds-p-around_xxx-small').scrollTop=0;
     }
 
     /*
@@ -176,10 +200,7 @@ export default class ChatWindow extends LightningElement {
     decryptMessage(message, sender, fromName, messageId) {
         decryptMessage({ msg: message, snd: sender })
             .then(result => {
-                    console.log('decrypting..');
-                    console.log(result);
                     let fullMessage = [{message: result.message, senderName: fromName, senderId: sender, timestamp: result.timestamp, messageId: messageId}];
-                    console.log(fullMessage);
                     this.displayMessage(fullMessage);
                 if(!this.mute && sender != this.userId){
                     this.showToast(result.message);
@@ -188,7 +209,7 @@ export default class ChatWindow extends LightningElement {
                 this.scrollToBottom();
             })
             .catch(error => {
-                this.error = error;
+                this.showToastNoStrip('Something went wrong',error,'error');
             });
     }
 
@@ -207,8 +228,6 @@ export default class ChatWindow extends LightningElement {
         });
 
         this.shareContent(fileIds, msg);
-        //var fileMessage = [{message: msg, senderName: this.activeUsersName, senderId: this.userId, timestamp: ''}];
-        
     }
 
     /*
@@ -220,6 +239,9 @@ export default class ChatWindow extends LightningElement {
         shareContent({userOrGroupId: this.recipientId, documentIds: ids})
             .then(result => {
                 this.sendMessage(msg);
+            })
+            .catch(error => {
+                this.showToastNoStrip('Something went wrong',error.body.message,'error');
             })
     }
 
@@ -238,6 +260,20 @@ export default class ChatWindow extends LightningElement {
     }
 
     /*
+        showToastNoStrip
+        Doesn't strip any of the messages of characters before displaying the received message
+        
+    */
+   showToastNoStrip(title, msg, error) {
+    const event = new ShowToastEvent({
+        title: title,
+        message: msg,
+        variant: error
+    });
+    this.dispatchEvent(event);
+}
+
+    /*
         sendMessage
         Passes all relevant information to the Apex method to handle the sending of the message via a platform event
     */
@@ -249,7 +285,7 @@ export default class ChatWindow extends LightningElement {
                 }
             })
             .catch(error => {
-                var error = error;
+                this.showToastNoStrip('Something went wrong',error.body.message,'error');
             });
     }
 
@@ -270,8 +306,21 @@ export default class ChatWindow extends LightningElement {
                 this.showToast(result);
                 this.toggleSelectForChatter();
                 this.toggleChatterModal();
+            })
+            .catch(error => {
+                this.showToastNoStrip('Something went wrong',error.body.message,'error');
             });
     }
+
+    /*
+        toggleShrinkMenu
+        Fired when either of the 2 buttons are pressed to expand or hide the menu buttons
+    */
+    toggleShrinkMenu(event){
+        this.menuShrunk = !this.menuShrunk;
+        event.currentTarget.classList.toggle('rotate-180');
+    }
+
 
     /*
         handleSelectedRecord

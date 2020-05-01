@@ -24,6 +24,11 @@
     right: 0; 
     bottom: 0; 
     height:400px;
+    background-color: white;
+}
+
+.rotate-180 {
+    transform: rotate(180deg);
 }
 
 .both-message {

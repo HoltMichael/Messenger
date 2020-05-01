@@ -12,7 +12,7 @@ export default class UserSearch extends LightningElement {
     numGroups;
 
     /*
-        showUsers
+        showUsers getter
         Set the users template to appear and show available users,
         so long as there are more than 0 users returned.
     */
@@ -21,14 +21,12 @@ export default class UserSearch extends LightningElement {
     }
 
     /*
-        showGroups
+        showGroups getter
         Set the groups template to appear and show available groups,
         so long as there are more than 0 groups returned.
-        Disabled for version 1
     */
     get showGroups(){
-        return false;
-        //return this.numGroups > 0;
+        return this.numGroups > 0;
     }
 
     /*
@@ -46,24 +44,24 @@ export default class UserSearch extends LightningElement {
     }
 
     /*
-        userHeight
+        userHeight getter
         Change the height of the "user" view depending on the number of users returned
     */
     get userHeight(){
         if(this.users.data){
-            var height = 30;
-            if(this.numUsers < 30){
+            var height = 10;
+            if(this.numUsers < 10){
                 height = this.numUsers + 1;
             }
-            if(height > 30){
-                height = 30;
+            if(height > 10){
+                height = 10;
             }
             return 'height:' + height + 'rem;width:24rem';
         }
     }
 
     /*
-        userHeight
+        groupHeight getter
         Change the height of the "group" view depending on the number of groups returned
     */
     get groupHeight(){
@@ -92,10 +90,9 @@ export default class UserSearch extends LightningElement {
             this.users = data;
             if(this.users.data){
                 this.numUsers = this.users.data.length;
-                //this.setUserHeight();
             }
         } else if(error){
-            console.log(error);   
+            
         }
     } 
 
@@ -111,10 +108,13 @@ export default class UserSearch extends LightningElement {
             this.groups = data;
             if(this.groups.data){
                 this.numGroups = this.groups.data.length;
-                //this.setGroupHeight();
+                const groupEvent = new CustomEvent('groupsretrieved', {
+                    detail: { groups: this.groups}
+                });
+                this.dispatchEvent(groupEvent);
             }
         } else if(error){
-            console.log(error);   
+            
         }
     } 
 

@@ -32,16 +32,13 @@ public with sharing class recordSearchUtils {
     */
     @AuraEnabled(cacheable = true)
     public static List<SObject> findRecords(String searchKey, String objectName, String searchField){
-        system.debug(searchKey);
         searchKey = String.escapeSingleQuotes(searchKey);
         objectName = String.escapeSingleQuotes(objectName);
         searchField = String.escapeSingleQuotes(searchField);
         String key = '%' + searchKey + '%';
-        system.debug(key);
         List<SObject> sObjectList = new List<SObject>();
         try{
             String query = 'Select Id, '+searchField+' From '+objectName +' Where '+searchField +' LIKE :key WITH SECURITY_ENFORCED LIMIT 10';
-            system.debug(query);
             sObjectList = Database.query(QUERY);
         }catch(System.QueryException e){
         }

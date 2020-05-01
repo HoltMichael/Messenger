@@ -81,7 +81,6 @@ export default class recordLookup extends LightningElement {
                     this.records[i].Name = rec[this.searchfield];
                 }
                 this.error = undefined;
-                //console.log(' records ', this.records);
             })
             .catch(error => {
                 this.error = error;

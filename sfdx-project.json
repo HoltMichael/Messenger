@@ -1,11 +1,24 @@
 {
-  "packageDirectories": [
-    {
-      "path": "force-app",
-      "default": true
+    "packageDirectories": [
+        {
+            "path": "force-app",
+            "default": true,
+            "package": "Messenger",
+            "versionName": "ver 0.2",
+            "postInstallScript": "EncryptionKeyGenerator",
+            "ancestorId": "04t1n0000028NvYAAU",
+            "versionNumber": "0.3.0.NEXT"
+        }
+    ],
+    "namespace": "MHolt",
+    "sfdcLoginUrl": "https://login.salesforce.com",
+    "sourceApiVersion": "48.0",
+    "packageAliases": {
+        "Messenger": "0Ho1n000000Kyl2CAC",
+        "Messenger@0.2.0-1": "04t1n0000028NviAAE",
+        "Messenger@0.3.0-1": "04t1n0000028NvnAAE",
+        "Messenger@0.3.0-3": "04t1n0000028Nw2AAE",
+        "Messenger@0.3.0-4": "04t1n0000028NwCAAU",
+        "Messenger@0.3.0-5": "04t1n0000028NwHAAU"
     }
-  ],
-  "namespace": "MHolt",
-  "sfdcLoginUrl": "https://login.salesforce.com",
-  "sourceApiVersion": "48.0"
 }

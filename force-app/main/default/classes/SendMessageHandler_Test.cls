@@ -41,7 +41,7 @@ public with sharing class SendMessageHandler_Test {
         String cryptoKeyDummy = '71Hnt5gqRX0N5CWUMWbBwozy5H8mSzXNtPArOJUhSao=';
         String nameStyle = '%michael.holt.test%';
         List<User> users = [SELECT id, name, username FROM User WHERE username like: nameStyle];
-        System.debug(users);
+        
         Test.startTest();
             System.runAs(users[0]){
                 sendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
@@ -97,7 +97,7 @@ public with sharing class SendMessageHandler_Test {
         Test.startTest();
             sendMessageHandler.postToChatter(msgIds, users[0].id);
         Test.stopTest();
-        List<FeedItem> ChatterFeeds = [SELECT id, LastEditById, Body, CommentCount, ParentId FROM FeedItem];
+        List<FeedItem> ChatterFeeds = [SELECT id, Body, CommentCount, ParentId FROM FeedItem];
         //Check there is just a single feed item in the org
         System.assertEquals(1, ChatterFeeds.Size());
         //Check the feed item has 19 comments on it (first post is the Feed Item itself: 20 - 1 = 19)

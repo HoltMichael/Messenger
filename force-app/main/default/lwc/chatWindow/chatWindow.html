@@ -1,4 +1,4 @@
-<template>
+<template >
     <template if:true={loading}>
         <div>
             <lightning-spinner style="position:absolute; top:100px" alternative-text="Loading" size="medium"></lightning-spinner>
@@ -25,31 +25,40 @@
                 </div>
             </template>
 
-            <div class="slds-p-around_small chat-window-box" >
-                <div class="button-row slds-p-bottom_x-small" style="z-index: 2;">
-                    <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:end_chat" onclick={closeWindow}  alternative-text="End Chat" title="End Chat"></lightning-button-icon>
-                    <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:arrowup" onclick={scrollToTop}  alternative-text="Scroll to Top" title="Scroll to Top"></lightning-button-icon>
-                    <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:arrowdown" onclick={scrollToBottom}  alternative-text="Scroll to Bottom" title="Scroll to Bottom"></lightning-button-icon>
-                    <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:comments" onclick={toggleFullHistory}  alternative-text="Load Full History" title="Load Full History"></lightning-button-icon>
-                    <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name={muteIcon} onclick={toggleMute}  alternative-text="Notifications Off" title="Notifications Off"></lightning-button-icon>
-                    <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:image" onclick={toggleUploadModal}  alternative-text="Send File" title="Send File"></lightning-button-icon>
-                    <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="action:share_post" onclick={toggleSelectForChatter}  alternative-text="Post to Chatter" title="Post to Chatter"></lightning-button-icon>
+            <div class="slds-p-around_xxx-small chat-window-box" >
+                <div class="button-row slds-p-bottom_xxx-small" style="z-index: 2;">
+                    <template if:false={menuShrunk}>
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:end_chat" onclick={closeWindow}  alternative-text="End Chat" title="End Chat"></lightning-button-icon>
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:arrowup" onclick={scrollToTop}  alternative-text="Scroll to Top" title="Scroll to Top"></lightning-button-icon>
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:arrowdown" onclick={scrollToBottom}  alternative-text="Scroll to Bottom" title="Scroll to Bottom"></lightning-button-icon>
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:comments" onclick={toggleFullHistory}  alternative-text="Load Full History" title="Load Full History"></lightning-button-icon>
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name={muteIcon} onclick={toggleMute}  alternative-text="Notifications Off" title="Notifications Off"></lightning-button-icon>
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:image" onclick={toggleUploadModal}  alternative-text="Send File" title="Send File"></lightning-button-icon>
+                        <lightning-button-icon class="slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="action:share_post" onclick={toggleSelectForChatter}  alternative-text="Post to Chatter" title="Post to Chatter"></lightning-button-icon>
+                    </template>
+                    <lightning-button-icon class="rotate-180 slds-p-left_xxx-small slds-button_icon-border-filled slds-button" icon-name="utility:macros" onclick={toggleShrinkMenu}  alternative-text="Shrink Menu" title="Shrink Menu"></lightning-button-icon>
                 </div>
-
-                <template for:each={chatText} for:item="chat">
-                    <div data-target-id={chat.messageId} key={chat.messageId} class={chat.cls} onclick={handleChatSelect}>
-                        <p>
-                            <lightning-formatted-rich-text style="font-weight: bold; color:grey" value={chat.senderName}></lightning-formatted-rich-text> 
-                            <lightning-formatted-rich-text class="slds-m-left_x-small" style="font-size:9px; color:grey" value={chat.timestamp}></lightning-formatted-rich-text>
-                        </p>
-                        <p>
-                            <lightning-formatted-rich-text value={chat.message}></lightning-formatted-rich-text>
-                        </p>
-                    </div>
-                </template>
+                <div class="slds-p-around_small">
+                    <template for:each={chatText} for:item="chat">
+                        <div data-target-id={chat.messageId} key={chat.messageId} class={chat.cls} onclick={handleChatSelect}>
+                            <p>
+                                <lightning-formatted-rich-text style="font-weight: bold; color:grey" value={chat.senderName}></lightning-formatted-rich-text> 
+                                <lightning-formatted-rich-text class="slds-m-left_x-small" style="font-size:9px; color:grey" value={chat.timestamp}></lightning-formatted-rich-text>
+                            </p>
+                            <p>
+                                <lightning-formatted-rich-text value={chat.message}></lightning-formatted-rich-text>
+                            </p>
+                        </div>
+                    </template>
+                </div>
                 <div class="slds-col slds-size_1-of-1 text-box" style="clear: both">
                     <template if:false={selectForChatter}>
                         <lightning-input-rich-text class="slds-p-top_xx-small" disabled-categories="FORMAT_FONT, FORMAT_BODY, ALIGN_TEXT, INSERT_CONTENT, REMOVE_FORMATTING" value={currentText} onkeyup={handleKeyPress}></lightning-input-rich-text>
+                    </template>
+                    <template if:true={isSmall}>
+                        <lightning-button class="slds-align_absolute-center slds-p-top_small" value="Send" label="Send" onclick={sendMessageForMobile}></lightning-button>
+                        <lightning-helptext content="Messenger on mobile has some limitations in the current version. New messages will be displayed only when refreshing the page.
+                        This is a Salesforce platform event technology limitation we are looking for a resolution to."></lightning-helptext>
                     </template>
                 </div>
             </div>

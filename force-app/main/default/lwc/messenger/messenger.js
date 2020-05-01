@@ -1,8 +1,10 @@
 import { LightningElement, track, wire } from 'lwc';
 import { getRecord } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent'
-import { subscribe, unsubscribe, onError, setDebugFlag, isEmpEnabled } from 'lightning/empApi';
+import { subscribe, onError } from 'lightning/empApi';
 import hasUserAndEventAccess from '@salesforce/apex/MessengerUtils.hasUserAndEventAccess';
+import getOfflineMessages from '@salesforce/apex/MessengerUtils.getOfflineMessages';
+import getGroupsWithCurrentUser from '@salesforce/apex/MessengerUtils.getGroupsWithCurrentUser';
 import Id from '@salesforce/user/Id'; 
 
 export default class Messenger extends LightningElement {
@@ -17,11 +19,14 @@ export default class Messenger extends LightningElement {
     latestMessage;
     //The platform event bus to subscribe to
     channelName = '/event/MHolt__Message__e';
+    //Holds the IDs of all the groups this user is a part of, so that they receive messages when they come in
+    groupIds;
     //Holds information for all of the currently open chat windows (tabs)
     @track chatWindows = [];
     @track objUser = {};
     @track access;
     @track loading=true;
+    showFirstToastPopup;
 
     /*
         wiredAccess
@@ -41,11 +46,46 @@ export default class Messenger extends LightningElement {
         }else if(error){
             this.loading = true;
             this.access = false;
+            this.showToast('Something Went Wrong!',error.body.message, 'error');
         }
     }
 
+    /*
+        getOfflineMessages
+        Retrieves any messages that may have come in when 
+        the user was offline and opens those respective tabs
+        Turns off the "New Message" popup when the user first gets a message, otherwise they could be 
+        inundated with toast messages for every offline message they received
+        Send one generic toast instead, if they have received messages whilst offline
+    */
+   @wire(getOfflineMessages) 
+   getOfflineMessages({error, data}){
+       if(data){
+            var hasMessages = false;
+            this.showFirstToastPopup = false;
+            for(let key in data) {
+                if (data.hasOwnProperty(key)) {
+                    hasMessages = true;
+                    this.selectedChatId=key;
+                    this.selectedChatName=data[key];
+                    this.createChatWindow(false);
+                }
+            }
+            this.showFirstToastPopup = true;
+            if(hasMessages == true){
+                this.showToast('New Messages Received Offline', 'Check your open tabs for new messages while you were gone')
+            }
+       }else if(error){
+            this.showToast('Something went wrong!', error.body.message);
+       }
+   }
+
+    populateGroups(event){
+        this.groupIds = event.detail.groups.data;
+    }
 
     /*
+        constructor
         Move the focus into the newly created window
         If the message is incoming, immediately move the focus out (Don't want to jump tab without the user's action)
         This prevents the tab from lazy loading and causing future messages to be missed
@@ -66,23 +106,26 @@ export default class Messenger extends LightningElement {
         this.callFuncAfterTimer(this.setActiveTab, this.selectedChatId, 10);
         if(!event.detail.focus()){
             this.callFuncAfterTimer(this.setActiveTab,'Home', 10);
-            this.showFirstToast();
+            this.showToast(this.selectedChatName, 'New Message!', 'info');
         }
     }
 
     /*
-        showFirstToast
+        showToast
         Show the toast for the first message inside a chat window. Not using the inner component toast function
         As calling this needs to be done after the component exists and needs to decrypt the message. Firing a
         slightly less informative toast here for this first message is quicker. All future messages are handled
         by chatWindow's fireToast function
     */
-    showFirstToast(){
-        const event = new ShowToastEvent({
-            title: this.selectedChatName,
-            message: 'New Message!',
-        });
-        this.dispatchEvent(event);
+    showToast(title, message, variant){
+        if(this.showFirstToastPopup){
+            const event = new ShowToastEvent({
+                title: title,
+                message: message,
+                variant: variant
+            });
+            this.dispatchEvent(event);
+        }
     }
 
     /*
@@ -91,7 +134,6 @@ export default class Messenger extends LightningElement {
         Identifies the position of the current window and removes it from the array, closing the tab
     */
     handleWindowClose(event){
-        console.log(event.detail.recipientId);
         var indexOfWindow = this.getChatWindowIndex(event.detail.recipientId);
         this.chatWindows.splice(indexOfWindow, 1);
     }
@@ -110,12 +152,19 @@ export default class Messenger extends LightningElement {
                 sender: response.data.payload.MHolt__From_User__c,
                 recip: response.data.payload.MHolt__To_User__c,
                 fromName: response.data.payload.MHolt__From_Name__c,
-                messageId: response.data.payload.MHolt__Message_Id__c
+                messageId: response.data.payload.MHolt__Message_Id__c,
+                isGroup: false
             }
-            
-            const allChats = this.template.querySelectorAll('c-chat-window');      
             //If the window isn't already open and it wasn't this user that sent the message, open a chat window for the inbound message sender
-            if(this.getChatWindowIndex(this.latestMessage.sender) == -1 && this.latestMessage.sender != this.userId){
+            if(this.groupIds.indexOf(this.latestMessage.recip > -1) && this.latestMessage.recip.startsWith('00G')){
+                this.latestMessage.isGroup = true;
+                this.selectedChatId =  this.latestMessage.recip;
+                this.selectedChatName = this.groupIds.find(element => element.Id == this.latestMessage.recip).Name;
+                if(this.getChatWindowIndex(this.latestMessage.recip) == -1){
+                    this.createChatWindow(false);
+                }   
+            //}else if(this.getChatWindowIndex(this.latestMessage.sender) == -1 && this.latestMessage.sender != this.userId){
+            }else if(this.getChatWindowIndex(this.latestMessage.sender) == -1 && this.latestMessage.sender != this.userId && this.latestMessage.recip == this.userId){
                 this.selectedChatId = this.latestMessage.sender;
                 this.selectedChatName = this.latestMessage.fromName;
                 this.createChatWindow(false);
@@ -154,26 +203,9 @@ export default class Messenger extends LightningElement {
     registerErrorListener() {
         // Invoke onError empApi method
         onError(error => {
-            this.showErrorToast;
-            //console.log('Received error from server: ', JSON.stringify(error));
+            this.showToast('Something Went Wrong!',error.body.message, 'error');
         });
-    }
-
-    /*
-        showErrorToast
-        Show generic message that something has gone wrong with the component.
-        Used for when an error occurs with the platform event.
-    */
-    showErrorToast(){
-        const event = new ShowToastEvent({
-            title: 'Something Went Wrong!',
-            message: 'Messenger has experienced an issue and may not work as intended',
-            variant: 'error'
-        });
-        this.dispatchEvent(event);
-    }
-
-    
+    }    
     
     /*
         userData
@@ -193,7 +225,7 @@ export default class Messenger extends LightningElement {
             }
         } 
         else if(error) {
-            window.console.log('error ====> '+JSON.stringify(error))
+            this.showToast('Something Went Wrong!',error.body.message, 'error');
         } 
     }
 
@@ -223,11 +255,24 @@ export default class Messenger extends LightningElement {
     */
     createChatWindow(focusWindow){
         this.chatWindows.push({key: this.selectedChatId, value: this.selectedChatName, photo: this.selectedChatPhoto});
-        const selectEvent = new CustomEvent('windowChange', {
+        const windowEvent = new CustomEvent('windowChange', {
             detail: {focus: () => focusWindow ,bubbles: true}
         });
-        this.dispatchEvent(selectEvent);
+        this.dispatchEvent(windowEvent);
     }
+
+    getChatHistory(recordLimit) {
+        this.loading = true;
+        getChatHistory({ user1: this.userId, user2: this.recipientId, lim: recordLimit})
+            .then(result => {
+                this.chatText = [];
+                this.displayMessage(result); 
+            })
+            .catch(error => {
+                this.showToast('Something Went Wrong!',error.body.message, 'error');
+            });
+    }
+
 
     /*
         callFuncAfterTimer
@@ -248,7 +293,12 @@ export default class Messenger extends LightningElement {
     passMessagetoChild(self){
         var allChats = self.template.querySelectorAll('c-chat-window');    
         allChats.forEach(thisChat => {
-            if(thisChat.recipientId == self.latestMessage.sender || (self.latestMessage.sender == self.userId && self.latestMessage.recip == thisChat.recipientId)){
+            //If we're messaging a group
+            if(this.latestMessage.isGroup && this.latestMessage.recip == thisChat.recipientId){
+                thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.fromName, self.latestMessage.messageId);
+                this.break;
+            //If we're messaging an individual
+            }else if(!this.latestMessage.isGroup && (thisChat.recipientId == self.latestMessage.sender || (self.latestMessage.sender == self.userId && self.latestMessage.recip == thisChat.recipientId))){
                 thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.fromName, self.latestMessage.messageId);
             }
         });
