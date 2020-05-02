@@ -4,7 +4,7 @@ public with sharing class MessengerUtils_Test {
     static void makeData(){
         User u1 = new User(
                             ProfileId = [SELECT Id FROM Profile WHERE Name = 'System Administrator'].Id,
-                            FirstName = 'Michael',
+                            FirstName = 'MichaelXTest001',
                             LastName = 'one',
                             Email = 'puser000@amamama.com',
                             Username = 'michael.holt.test.001@example.com' + System.currentTimeMillis(),
@@ -17,7 +17,7 @@ public with sharing class MessengerUtils_Test {
                             LocaleSidKey = 'en_US');
         User u2 = new User(
                             ProfileId = [SELECT Id FROM Profile WHERE Name = 'Standard User'].Id,
-                            FirstName = 'Michael',
+                            FirstName = 'MichaelXTest002',
                             LastName = 'two',
                             Email = 'puser000@amamama.com',
                             Username = 'michael.holt.test.002@example.com' + System.currentTimeMillis(),
@@ -38,13 +38,21 @@ public with sharing class MessengerUtils_Test {
     */
     @isTest
     public static void findUsersTest(){
+        String nameStyle = '%michael.holt.test%';
+        List<User> user = [SELECT id, name, username FROM User WHERE username like: nameStyle];
         Test.startTest();
-            //Test getting multiple records back
-            System.assertEquals(2, MessengerUtils.findUsers('michael').size());
-            //Test getting one record back
-            System.assertEquals(1, MessengerUtils.findUsers('one').size());
-            //Test getting no records back
-            System.assertEquals(0, MessengerUtils.findUsers('xyz').size());
+            //Nobody in the org has the perm set, so expect 0 results
+            System.assertEquals(0, MessengerUtils.findUsers('MichaelXTest00').size());
+            //Assign permission set to 1 user and expect 1 result
+            PermissionSet ps1 = [SELECT Id FROM PermissionSet WHERE Name = 'Messenger_User' AND NamespacePrefix='MHolt'];
+            insert new PermissionSetAssignment(AssigneeId = user[0].id, PermissionSetId = ps1.Id);
+            System.assertEquals(1, MessengerUtils.findUsers('MichaelXTest00').size());
+            //Assign permission set to second user and expect 2 results
+            PermissionSet ps2 = [SELECT Id FROM PermissionSet WHERE Name = 'Messenger_User' AND NamespacePrefix='MHolt'];
+            insert new PermissionSetAssignment(AssigneeId = user[1].id, PermissionSetId = ps2.Id);
+            System.assertEquals(2, MessengerUtils.findUsers('MichaelXTest00').size());
+            //Make sure it only pulls back users matching the search criteria, when multiple users have the perm set
+            System.assertEquals(1, MessengerUtils.findUsers('MichaelXTest002').size());
         Test.stopTest();
     }
 
@@ -54,22 +62,79 @@ public with sharing class MessengerUtils_Test {
     */
     @isTest
     public static void findGroupsTest(){
-        List<Group> groups = new List<Group>();
+        String nameStyle = '%michael.holt.test%';
+        List<User> user = [SELECT id, name, username FROM User WHERE username like: nameStyle];
+
+        //Make some groups, private and public, it shouldn't make a difference
+        List<CollaborationGroup> groups = new List<CollaborationGroup>();
         for(integer i = 0; i < 10; i++){
-            Group g = new Group(name = 'test: ' + i);
+            CollaborationGroup g = new CollaborationGroup();
+            if(i<5){
+                g = new CollaborationGroup(name = 'test: ' + i, CollaborationType='Public');
+            }else{
+                g = new CollaborationGroup(name = 'test: ' + i, CollaborationType='Private');
+            }
+
             groups.add(g);
         }
         insert groups;
-        
+        //Add the first user to 4 groups
+        CollaborationGroupMember gm1 = new CollaborationGroupMember(MemberId = user[0].id, CollaborationGroupId= groups[0].id);
+        CollaborationGroupMember gm2 = new CollaborationGroupMember(MemberId = user[0].id, CollaborationGroupId= groups[1].id);
+        CollaborationGroupMember gm3 = new CollaborationGroupMember(MemberId = user[0].id, CollaborationGroupId= groups[2].id);
+        CollaborationGroupMember gm4 = new CollaborationGroupMember(MemberId = user[0].id, CollaborationGroupId= groups[3].id);
+        //Add the second user to 7 groups, including 1 crossover
+        CollaborationGroupMember gm5 = new CollaborationGroupMember(MemberId = user[1].id, CollaborationGroupId= groups[3].id);
+        CollaborationGroupMember gm6 = new CollaborationGroupMember(MemberId = user[1].id, CollaborationGroupId= groups[4].id);
+        CollaborationGroupMember gm7 = new CollaborationGroupMember(MemberId = user[1].id, CollaborationGroupId= groups[5].id);
+        CollaborationGroupMember gm8 = new CollaborationGroupMember(MemberId = user[1].id, CollaborationGroupId= groups[6].id);
+        CollaborationGroupMember gm9 = new CollaborationGroupMember(MemberId = user[1].id, CollaborationGroupId= groups[7].id);
+        CollaborationGroupMember gm10 = new CollaborationGroupMember(MemberId = user[1].id, CollaborationGroupId= groups[8].id);
+        CollaborationGroupMember gm11 = new CollaborationGroupMember(MemberId = user[1].id, CollaborationGroupId= groups[9].id);
+        insert new List<CollaborationGroupMember>{gm1,gm2,gm3,gm4,gm5,gm6,gm7,gm8,gm9,gm10,gm11};
+
         test.startTest();
-            //Test getting multiple records back
-            System.assertEquals(10, MessengerUtils.findGroups('test: ').size());
-            //Test getting one record back
-            System.assertEquals(1, MessengerUtils.findGroups('test: 1').size());
-            //Test getting nothing back
-            System.assertEquals(0, MessengerUtils.findGroups('test: X').size());
+            System.RunAs(user[0]){
+                System.assertEquals(4, MessengerUtils.findGroups('').size());
+                System.assertEquals(4, MessengerUtils.findGroups('test').size());
+                System.assertEquals(1, MessengerUtils.findGroups('1').size());
+                System.assertEquals(0, MessengerUtils.findGroups('4').size());
+            }
+            System.RunAs(user[1]){
+                System.assertEquals(7, MessengerUtils.findGroups('').size());
+                System.assertEquals(7, MessengerUtils.findGroups('test').size());
+                System.assertEquals(1, MessengerUtils.findGroups('7').size());
+                System.assertEquals(0, MessengerUtils.findGroups('1').size());
+            }
         test.stopTest();
     }
+
+    /*
+        getOfflineMessages
+
+    */
+    @isTest
+    public static void getOfflineMessagesTest(){
+        String nameStyle = '%michael.holt.test%';
+        List<User> users = [SELECT id, name, username FROM User WHERE username like: nameStyle];
+
+        test.startTest();
+            system.runAs(users[0]){
+                sendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
+                MHolt__Chat_Message__c msg = [SELECT id, MHolt__Read__c FROM MHolt__Chat_Message__c][0];
+                msg.MHolt__Read__c = true;
+                update msg;
+                //Check that no messages are returned if inserted messages have already been marked as 'read'
+                System.assertEquals(0, MessengerUtils.getOfflineMessages().size());
+                sendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
+                //Check that a message is returned and contains the name of the user who sent the message
+                //if a message has not been marked as 'read'
+                System.assertEquals(1, MessengerUtils.getOfflineMessages().size());
+                System.assertEquals(users[0].name, MessengerUtils.getOfflineMessages().get(users[0].id));
+            }
+        test.stopTest();
+    }
+
 
     /*
         hasUserAndEventAccessTest

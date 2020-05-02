@@ -4,10 +4,10 @@
             "path": "force-app",
             "default": true,
             "package": "Messenger",
-            "versionName": "ver 0.2",
+            "versionName": "ver 0.4",
             "postInstallScript": "EncryptionKeyGenerator",
             "ancestorId": "04t1n0000028NvYAAU",
-            "versionNumber": "0.3.0.NEXT"
+            "versionNumber": "0.4.0.NEXT"
         }
     ],
     "namespace": "MHolt",
@@ -19,6 +19,7 @@
         "Messenger@0.3.0-1": "04t1n0000028NvnAAE",
         "Messenger@0.3.0-3": "04t1n0000028Nw2AAE",
         "Messenger@0.3.0-4": "04t1n0000028NwCAAU",
-        "Messenger@0.3.0-5": "04t1n0000028NwHAAU"
+        "Messenger@0.3.0-5": "04t1n0000028NwHAAU",
+        "Messenger@0.4.0-1": "04t1n0000028NwgAAE"
     }
 }

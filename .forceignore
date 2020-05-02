@@ -10,7 +10,11 @@ package.xml
 **profiles
 **CustomApplication
 force-app/main/default/applications/standard__LightningSales.app-meta.xml
-**flexipage
+**flexipage**
+**Group**
+**ListView**
+**.app 
+
 
 # LWC Jest
 **/__tests__/**

@@ -79,6 +79,41 @@ public with sharing class SendMessageHandler_Test {
     }
 
     /*
+        setChatReadTest
+        Check the setChatRead method in the SendMessageHandler, are marked as "read"
+        when the message is called. 
+    */
+    @isTest
+    public static void setChatReadTest(){
+        String nameStyle = '%michael.holt.test%';
+        List<User> users = [SELECT id, name, username FROM User WHERE username like: nameStyle];
+
+        System.runAs(users[1]){
+            //Insert 10 messages using the sendMessage method
+            SendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
+            SendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
+            SendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
+            SendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
+            SendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
+            SendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
+            SendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
+            SendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
+            SendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
+            SendMessageHandler.sendMessage('test message', users[0].id, users[1].id, users[0].name);
+
+            List<MHolt__Chat_Message__c> msgs = [SELECT id, MHolt__Read__c FROM MHolt__Chat_Message__c WHERE MHolt__Read__c = false];
+            System.assertEquals(10, msgs.size());
+
+            test.startTest();
+                sendMessageHandler.setChatRead(users[1].id);
+            test.stopTest();
+            msgs = [SELECT id, MHolt__Read__c FROM MHolt__Chat_Message__c WHERE MHolt__Read__c = true];
+            System.assertEquals(10, msgs.size());
+        }
+    }
+
+
+    /*
         postToChatterTest
         Checks the postToChatter method in the SendMessageHandler class. A series of 20 messages are 
         selected to be posted to Chatter. The first should be posted as a feed item and the remaining 19
@@ -173,7 +208,7 @@ public with sharing class SendMessageHandler_Test {
         ensure they are returned from the database and are decrypted
     */
     @isTest
-    public static void getChatHistoryTest(){
+    public static void getChatHistoryTest_User(){
         String nameStyle = '%michael.holt.test%';
         List<User> users = [SELECT id, name, username FROM User WHERE username like: nameStyle];
 
@@ -186,6 +221,46 @@ public with sharing class SendMessageHandler_Test {
             Test.startTest();
                 //Call the getChatHistory method and request 15 messages for these 2 users
                 List<SendMessageHandler.MessageWrapper> msgs = SendMessageHandler.getChatHistory(users[0].id, users[1].id, 15);
+            Test.stopTest();
+
+            //Check that the messages are encrypted whilst in the database
+            List<MHolt__Chat_Message__c> encryptedMsgs = [SELECT id, MHolt__Message__c FROM MHolt__Chat_Message__c];
+            for(MHolt__Chat_Message__c enc : encryptedMsgs){
+                system.assertNotEquals('test message', enc.MHolt__Message__c);
+            }
+
+            //Check that 15 records have been pulled back and verify that those messages have been decrypted
+            System.assertEquals(15, msgs.size());
+            for(SendMessageHandler.MessageWrapper msg : msgs){
+                System.assertEquals('test message', msg.message);
+            }
+        }
+    }
+
+        /*
+        getChatHistoryTest_Group
+        Check that the getChatHistory method works when one of the IDs provided is a group, multiple users
+        can request a chat history from the same group. Check at this works with 2 different users. 
+        Request a limited number of records and ensure they are returned from the database and are decrypted
+    */
+    @isTest
+    public static void getChatHistoryTest_Group(){
+        String nameStyle = '%michael.holt.test%';
+        List<User> users = [SELECT id, name, username FROM User WHERE username like: nameStyle];
+
+        CollaborationGroup g = new CollaborationGroup(name = 'test group', CollaborationType='Public');
+        insert g;
+        System.runAs(users[0]){
+            //Insert 20 messages into the DB, using the sendMessage method, for 2 different users pinging the same group
+            for(integer i = 0; i < 10; i++){
+                sendMessageHandler.sendMessage('test message', g.id, users[0].id, users[0].name);
+                sendMessageHandler.sendMessage('test message', g.id, users[1].id, users[0].name);
+            }
+
+            Test.startTest();
+                //Call the getChatHistory method and request 15 messages for these 2 users
+                List<SendMessageHandler.MessageWrapper> msgs = SendMessageHandler.getChatHistory(users[0].id, g.id, 15);
+                List<SendMessageHandler.MessageWrapper> msgs1 = SendMessageHandler.getChatHistory(g.id, users[0].id, 15);
             Test.stopTest();
 
             //Check that the messages are encrypted whilst in the database

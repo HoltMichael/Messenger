@@ -12,95 +12,52 @@ public with sharing class MessengerUtils {
     /*
         findUsers
         Used on the home screen to filter the search for individual user chats
+        Returns a list of users who are active, have the Messenger permission set
+        and whose name match the searchKey parameter. If the searchKey is empty, 
+        all users matching the remaining criteria are returned
     */
     @AuraEnabled(cacheable=true)
     public static List<User> findUsers(String searchKey) {
         searchKey = String.escapeSingleQuotes(searchKey);
         String key = '%' + searchKey + '%';
         id i = userInfo.getUserId();
-        return [SELECT Id, Name, Title, FullPhotoUrl FROM User WHERE Name LIKE :key AND Id !=: i AND isActive=True WITH SECURITY_ENFORCED LIMIT 50];
+        List<Id> assIds = new List<Id>();
+        List<PermissionSetAssignment> assignments = [SELECT AssigneeId FROM PermissionSetAssignment WHERE PermissionSet.Name = 'Messenger_User' AND PermissionSet.NamespacePrefix='MHOLT'];
+        System.debug(assignments);
+        for(PermissionSetAssignment ass : assignments){
+            assIds.add(ass.AssigneeId);
+        }
+        return [SELECT Id, Name, Title, FullPhotoUrl FROM User WHERE Name LIKE :key AND Id !=: i AND isActive=True AND Id IN: assIds WITH SECURITY_ENFORCED LIMIT 50];
     }
-
 
     /*
         findGroups
         Used on the home screen to filter the search for group chats
+        Populated the groups array in the Messenger component to ensure messages sent to a group
+        are correctly triaged to the right users
     */
     @AuraEnabled(cacheable=true)
-    public static List<Group> findGroups(String searchKey) {
-        Id userId = UserInfo.getUserId();
+    public static List<CollaborationGroup> findGroups(String searchKey){
         searchKey = String.escapeSingleQuotes(searchKey);
         String key = '%' + searchKey + '%';
-                
-        //Declaring a Set as we don't want Duplicate Group Ids 
-        Set<Id> results = new Set<Id>(); 
-        ///Declaring a Map for Group with Role 
-        Map<Id,Id> grRoleMap = new Map<Id,Id>(); 
-        //Populating the Map with RelatedID(i.e.UserRoledId) as Key 
-        for(Group gr : [SELECT id, relatedid, name FROM Group]) { 
-            grRoleMap.put(gr.relatedId,gr.id); 
-        } 
-        //Groups directly associated to user 
-        Set<Id> groupwithUser = new Set<Id>(); 
-        //Populating the Group with User with GroupId we are filtering only for Group of Type Regular,Role and RoleAndSubordinates 
-        for(GroupMember u :[SELECT groupId 
-                            FROM GroupMember 
-                            WHERE UserOrGroupId=:userId 
-                            AND (Group.Type = 'Regular' 
-                            OR Group.Type='Role' 
-                            OR Group.Type='RoleAndSubordinates')]) { 
-            groupwithUser.add(u.groupId); 
-        } 
-        //Groups with Role 
-        for(User u :[select UserRoleId from User where id=: userId]) { 
-        //Checking if the current User Role is part of Map or not 
-            if(grRoleMap.containsKey(u.UserRoleId)) { 
-                results.add(grRoleMap.get(u.UserRoleId)); 
-            } 
-        } 
-        //Combining both the Set 
-        results.addAll(groupwithUser); 
-        //Traversing the whole list of Groups to check any other nested Group 
-        Map<Id,Id> grMap = new Map<Id,Id>(); 
-        for(GroupMember gr : [SELECT id,UserOrGroupId,Groupid
-                                FROM GroupMember where (Group.Type = 'Regular' 
-                                OR Group.Type='Role' 
-                                OR Group.Type='RoleAndSubordinates')]) { 
-            grMap.put(gr.UserOrGroupId,gr.Groupid); 
-        } 
-
-        for(Id i :results) { 
-            if(grMap.containsKey(i)) { 
-                results.add(grMap.get(i)); 
-            } 
-        } 
+        id i = userInfo.getUserId();
         
-        return [SELECT Id, Name FROM Group WHERE Id IN:results AND Name LIKE :key WITH SECURITY_ENFORCED LIMIT 50];
-    }
-
-
-
-
-    /*
-        getGroupsWithCurrentUser
-        Provides a list of Group IDs that this user is a member of
-        DELETE THIS, I SUSPECT
-    */
-    @AuraEnabled(cacheable=true)
-    public static List<Id> getGroupsWithCurrentUser(){
-        Id userId = UserInfo.getUserId();
         List<Id> groupIds = new List<Id>();
-        List<GroupMember> gms = [SELECT GroupId FROM GroupMember WHERE UserOrGroupId =: userId];
-        for(GroupMember gm : gms){
-            groupIds.add(gm.id);
+        List<CollaborationGroupMember> member = [SELECT CollaborationGroupId FROM CollaborationGroupMember WHERE MemberId=: i];
+        for(CollaborationGroupMember m : member){
+            groupIds.add(m.CollaborationGroupId);
         }
-        return groupIds;
+        return [SELECT Id, Name, SmallPhotoUrl FROM CollaborationGroup 
+                                WHERE Id IN: groupIds
+                                AND isArchived=false
+                                AND Name Like: key];
     }
 
     /*
         getOfflineMessages
         Find all messages for this particular user, which have not yet been read (ie. User was offline)
         This allows the message windows to be popped open automatically, when the user comes online, to see messages they missed
+        Returns the names of the people who sent the messages, mapped to their IDs
     */
     @AuraEnabled(cacheable=true)
     public static Map<Id,String> getOfflineMessages(){
@@ -113,7 +70,7 @@ public with sharing class MessengerUtils {
                                                 AND MHolt__Participants__c Like: userId
                                                 ORDER BY createdDate DESC];
         for(MHolt__Chat_Message__c msg : chatMsgs){
-            If(!msg.MHolt__Participant_1__c.startsWith('00G') && !msg.MHolt__Participant_2__c.startsWith('00G')){
+            If(!msg.MHolt__Participant_1__c.startsWith('0F9') && !msg.MHolt__Participant_2__c.startsWith('0F9')){
                 userById.put(msg.OwnerId, msg.Owner.Name);
             }
         }

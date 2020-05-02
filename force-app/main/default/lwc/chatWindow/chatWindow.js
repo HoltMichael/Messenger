@@ -30,7 +30,9 @@ export default class ChatWindow extends LightningElement {
     @track loading = false;
     @track selectForChatter = false;
     @track menuShrunk = false
+    @track textBoxHeight='height:25rem';
     formFactor = FORM_FACTOR;
+
     isSmall = (this.formFactor == 'Small');
     
     
@@ -41,6 +43,9 @@ export default class ChatWindow extends LightningElement {
     connectedCallback(){
         this.getChatHistory(50);
         this.setChatRead();
+        if(this.formFactor == 'Small'){
+            this.textBoxHeight = 'height:32rem';
+        }
     }
 
     /*
@@ -205,7 +210,6 @@ export default class ChatWindow extends LightningElement {
                 if(!this.mute && sender != this.userId){
                     this.showToast(result.message);
                 }
-                this.error = undefined;
                 this.scrollToBottom();
             })
             .catch(error => {

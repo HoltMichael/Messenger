@@ -4,7 +4,6 @@ import { ShowToastEvent } from 'lightning/platformShowToastEvent'
 import { subscribe, onError } from 'lightning/empApi';
 import hasUserAndEventAccess from '@salesforce/apex/MessengerUtils.hasUserAndEventAccess';
 import getOfflineMessages from '@salesforce/apex/MessengerUtils.getOfflineMessages';
-import getGroupsWithCurrentUser from '@salesforce/apex/MessengerUtils.getGroupsWithCurrentUser';
 import Id from '@salesforce/user/Id'; 
 
 export default class Messenger extends LightningElement {
@@ -65,10 +64,12 @@ export default class Messenger extends LightningElement {
             this.showFirstToastPopup = false;
             for(let key in data) {
                 if (data.hasOwnProperty(key)) {
-                    hasMessages = true;
-                    this.selectedChatId=key;
-                    this.selectedChatName=data[key];
-                    this.createChatWindow(false);
+                    if(key != this.userId){
+                        hasMessages = true;
+                        this.selectedChatId=key;
+                        this.selectedChatName=data[key];
+                        this.createChatWindow(false);
+                    }
                 }
             }
             this.showFirstToastPopup = true;
@@ -105,7 +106,12 @@ export default class Messenger extends LightningElement {
     handleWindowChange(event) {
         this.callFuncAfterTimer(this.setActiveTab, this.selectedChatId, 10);
         if(!event.detail.focus()){
-            this.callFuncAfterTimer(this.setActiveTab,'Home', 10);
+            if(!this.template.querySelector('lightning-tabset')){
+                tabVal = 'Home';
+            }else{
+                var tabVal = this.template.querySelector('lightning-tabset').activeTabValue;
+            }
+            this.callFuncAfterTimer(this.setActiveTab,tabVal, 10);
             this.showToast(this.selectedChatName, 'New Message!', 'info');
         }
     }
@@ -156,7 +162,7 @@ export default class Messenger extends LightningElement {
                 isGroup: false
             }
             //If the window isn't already open and it wasn't this user that sent the message, open a chat window for the inbound message sender
-            if(this.groupIds.indexOf(this.latestMessage.recip > -1) && this.latestMessage.recip.startsWith('00G')){
+            if(this.groupIds.indexOf(this.latestMessage.recip > -1) && this.latestMessage.recip.startsWith('0F9')){
                 this.latestMessage.isGroup = true;
                 this.selectedChatId =  this.latestMessage.recip;
                 this.selectedChatName = this.groupIds.find(element => element.Id == this.latestMessage.recip).Name;
@@ -240,7 +246,7 @@ export default class Messenger extends LightningElement {
         if(indexOfWindow == -1){
             this.selectedChatId = event.detail.userId();
             this.selectedChatName = event.detail.userName();
-            this.selectedChatPhoto = event.detail.userPic();
+            //this.selectedChatPhoto = event.detail.userPic();
             this.createChatWindow(true);
         }else{
             this.setActiveTab(this, event.detail.userId());
@@ -254,7 +260,7 @@ export default class Messenger extends LightningElement {
         Publish an event to get picked up by this component, in order to move the focus into the window
     */
     createChatWindow(focusWindow){
-        this.chatWindows.push({key: this.selectedChatId, value: this.selectedChatName, photo: this.selectedChatPhoto});
+        this.chatWindows.push({key: this.selectedChatId, value: this.selectedChatName});
         const windowEvent = new CustomEvent('windowChange', {
             detail: {focus: () => focusWindow ,bubbles: true}
         });

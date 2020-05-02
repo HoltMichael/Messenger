@@ -206,12 +206,11 @@ public without sharing class SendMessageHandler {
         String user2Like = '%' + user2 + '%';
         //If either of the users are groups, we need to get every message in that group, not just the messages with this user. 
         //Replace both WHERE parameters with the ID of the group
-        if(user1Like.startsWith('%00G')){
+        if(user1Like.startsWith('%0F9')){
             user2Like = user1Like;
-        }else if(user2Like.startsWith('%00G')){
+        }else if(user2Like.startsWith('%0F9')){
             user1Like = user2Like;
         }
-
         //Need to order DESC to get the latest messages, as we pull a maximum of lim number. Sort ASC will bring back the very oldest messages and miss the most recent
         List<MHolt__Chat_Message__c> chatMsgs = [SELECT Id, name, OwnerId, Owner.Name, MHolt__From_Name__c, MHolt__Message__c, MHolt__Participants__c, createdDate
                                                 FROM MHolt__Chat_Message__c 
@@ -219,7 +218,6 @@ public without sharing class SendMessageHandler {
                                                 AND MHolt__Participants__c like :user2Like
                                                 ORDER BY createdDate DESC
                                                 Limit :lim];
-
         List<User> users = getUsersWithSidkey(new List<String>{user1, user2});
         //Loop over the list of messages backwards, to sort their order, as they had to be pulled out of the DB DESC
         for(Integer i = chatMsgs.size() - 1; i >= 0; i--){
@@ -228,7 +226,6 @@ public without sharing class SendMessageHandler {
 
             Map<Id, DateTime> timesByUser = getTimeInTimezoneForUsers(users, msg.createdDate);
             MessageWrapper wrap = new MessageWrapper(decryptedMsg, msg.OwnerId, msg.Owner.Name, getTimeStamps(new List<DateTime>{timesByUser.get(userinfo.getuserid())})[0], msg.Id);
-
             returnMessages.add(wrap);
         }
         
@@ -340,13 +337,6 @@ public without sharing class SendMessageHandler {
         public MessageWrapper(String m, String i, String n, String t, String mi){
             message = m;
             timestamp = t;
-            senderId = i;
-            senderName = n;
-            messageId = mi;
-        }
- 
-        public MessageWrapper(String m, String i, String n, String mi){
-            message = m;
             senderId = i;
             senderName = n;
             messageId = mi;
