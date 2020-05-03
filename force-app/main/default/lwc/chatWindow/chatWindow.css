@@ -1,22 +1,52 @@
 .my-message {
     background-color: #9EE9A6;
     box-shadow: 2px 1px 3px 3px #ccc;
-
 }
 
 .their-message {
     background-color: #AADCF3;
     box-shadow: -2px 1px 3px 3px #ccc;
+}
 
+.my-message-selected{
+    background-color: #54CB87;
+}
+
+.their-message-selected{
+    background-color: #28aeed;
+}
+
+.chat-window-box{
+    overflow: auto; 
+    position: absolute; 
+    top: 0; 
+    left: 0; 
+    right: 0; 
+    bottom: 0; 
+    background-color: white;
+}
+
+.rotate-180 {
+    transform: rotate(180deg);
 }
 
 .both-message {
     border-radius: 7px;
     margin: 3px 0px;
-    padding: 5px;
+    padding: 10px;
     clear:both;
 }
 
-.THIS .canEnter .ql-editor.slds-rich-text-area__content {
-    min-height:14rem;
+.text-box{
+    position: sticky; 
+    bottom: 0;
+}
+
+.button{
+    background: red;
+}
+
+.button-row{
+    position: sticky;
+    top: 0;
 }

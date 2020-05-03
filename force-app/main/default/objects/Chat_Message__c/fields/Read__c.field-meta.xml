@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Read__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Described whether a particular message has been read by the user or not</description>
+    <externalId>false</externalId>
+    <label>Read</label>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>
