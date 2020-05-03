@@ -7,7 +7,7 @@
             "versionName": "ver 0.4",
             "postInstallScript": "EncryptionKeyGenerator",
             "ancestorId": "04t1n0000028NvYAAU",
-            "versionNumber": "0.4.0.NEXT"
+            "versionNumber": "0.5.0.NEXT"
         }
     ],
     "namespace": "MHolt",
@@ -20,6 +20,10 @@
         "Messenger@0.3.0-3": "04t1n0000028Nw2AAE",
         "Messenger@0.3.0-4": "04t1n0000028NwCAAU",
         "Messenger@0.3.0-5": "04t1n0000028NwHAAU",
-        "Messenger@0.4.0-1": "04t1n0000028NwgAAE"
+        "Messenger@0.4.0-1": "04t1n0000028NwgAAE",
+        "Messenger@0.4.0-2": "04t1n0000028NwlAAE",
+        "Messenger@0.5.0-1": "04t1n0000028NwqAAE",
+        "Messenger@0.5.0-2": "04t1n0000028NwvAAE",
+        "Messenger@0.5.0-3": "04t1n0000028Nx0AAE"
     }
 }

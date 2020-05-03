@@ -23,7 +23,6 @@ public with sharing class MessengerUtils {
         id i = userInfo.getUserId();
         List<Id> assIds = new List<Id>();
         List<PermissionSetAssignment> assignments = [SELECT AssigneeId FROM PermissionSetAssignment WHERE PermissionSet.Name = 'Messenger_User' AND PermissionSet.NamespacePrefix='MHOLT'];
-        System.debug(assignments);
         for(PermissionSetAssignment ass : assignments){
             assIds.add(ass.AssigneeId);
         }
@@ -50,7 +49,8 @@ public with sharing class MessengerUtils {
         return [SELECT Id, Name, SmallPhotoUrl FROM CollaborationGroup 
                                 WHERE Id IN: groupIds
                                 AND isArchived=false
-                                AND Name Like: key];
+                                AND Name Like: key
+                                Limit 50];
     }
 
     /*

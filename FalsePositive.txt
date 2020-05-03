@@ -1,0 +1,11 @@
+Client Password In Comment - No passwords stored in comments.
+Test Methods with No Assert - Not possible to insert custom metadata, so unable to verify that the custom metadata has actually been inserted.
+Client Insufficient ClickJacking Protection - .
+
+Apex Classes Without Sharing - Necessary in 2 cases
+
+EncryptionKeyGenerator
+To insert Custom Metadata on install. The installing user will not have access to install metadata of this type. Therefore need to run Without Sharing.
+
+SendMessageHandler
+To manipulate MHolt__Chat_Message__c records. In most cases, users will neither have read nor write access to this object because the object is not intended to be accessed outside of the app. Need to run without sharing, so that the records can be manipulated within the confines of the app

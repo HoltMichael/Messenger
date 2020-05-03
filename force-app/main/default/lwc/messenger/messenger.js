@@ -299,12 +299,12 @@ export default class Messenger extends LightningElement {
     passMessagetoChild(self){
         var allChats = self.template.querySelectorAll('c-chat-window');    
         allChats.forEach(thisChat => {
-            //If we're messaging a group
+            //If the message is to a group
             if(this.latestMessage.isGroup && this.latestMessage.recip == thisChat.recipientId){
                 thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.fromName, self.latestMessage.messageId);
                 this.break;
-            //If we're messaging an individual
-            }else if(!this.latestMessage.isGroup && (thisChat.recipientId == self.latestMessage.sender || (self.latestMessage.sender == self.userId && self.latestMessage.recip == thisChat.recipientId))){
+            //If the message is to an individual AND ((if the recipient of this chat is the sender of the message AND this user is the recipient of the message) OR (this user is the sender of the message and this chat is the recipient))
+            }else if(!this.latestMessage.isGroup && ((thisChat.recipientId == self.latestMessage.sender && self.latestMessage.recip == self.userId) || (self.latestMessage.sender == self.userId && self.latestMessage.recip == thisChat.recipientId))){
                 thisChat.decryptMessage(self.latestMessage.msg, self.latestMessage.sender, self.latestMessage.fromName, self.latestMessage.messageId);
             }
         });

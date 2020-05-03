@@ -7,7 +7,7 @@
     That is used for the process of all encrypting and decrypting of messages when sent using the Messenger app.
 */
 
-public with sharing class EncryptionKeyGenerator implements InstallHandler{
+public without sharing class EncryptionKeyGenerator implements InstallHandler{
     public static void onInstall(InstallContext context) {
         Blob cryptoKey = Crypto.generateAesKey(256);
         String cryptoKeyAsString = EncodingUtil.base64encode(cryptoKey);
