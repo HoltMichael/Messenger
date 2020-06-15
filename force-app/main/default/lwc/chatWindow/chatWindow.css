@@ -17,13 +17,17 @@
 }
 
 .chat-window-box{
-    overflow: auto; 
-    position: absolute; 
+    overflow: auto;  
+    position: absolute;
     top: 0; 
     left: 0; 
     right: 0; 
     bottom: 0; 
     background-color: white;
+}
+
+::-webkit-scrollbar {
+    display: none;
 }
 
 .rotate-180 {
