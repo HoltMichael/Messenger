@@ -385,6 +385,31 @@ export default class ChatWindow extends LightningElement {
     }
 
     /*
+        getVideoLink
+        Sends a request to Google for a meeting ID
+    */
+    getVideoLink(){
+        console.log('getting vid...');
+        var eventPatch = {
+            conferenceData: {
+                createRequest: {requestId: "7qxalsvy0e"}
+            }
+          };
+          console.log('1');
+          gapi.client.calendar.events.patch({
+            calendarId: "primary",
+            eventId: "7cbh8rpc10lrc0ckih9tafss99",
+            resource: eventPatch,
+            sendNotifications: true,
+            conferenceDataVersion: 1
+          }).execute(function(event) {
+            console.log('executing...');
+            console.log("Conference created for event: %s", event.htmlLink);
+          });
+          
+    }
+
+    /*
         closeWindow
         Fire an event to parent to get the current widnow to close
     */
