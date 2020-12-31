@@ -4,10 +4,10 @@
             "path": "force-app",
             "default": true,
             "package": "Messenger",
-            "versionName": "ver 0.4",
+            "versionName": "ver 0.6",
             "postInstallScript": "EncryptionKeyGenerator",
-            "ancestorId": "04t1n0000028NvYAAU",
-            "versionNumber": "0.5.0.NEXT"
+            "ancestorId": "04t1n0000028Nx0AAE",
+            "versionNumber": "0.6.0.NEXT"
         }
     ],
     "namespace": "MHolt",
