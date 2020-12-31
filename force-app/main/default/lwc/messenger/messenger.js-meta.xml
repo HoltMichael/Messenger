@@ -5,6 +5,5 @@
     <targets>
       <target>lightning__UtilityBar</target>
       <target>lightning__Tab</target>
-      <target>lightningCommunity__Page</target>
     </targets>
 </LightningComponentBundle>

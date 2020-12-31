@@ -53,8 +53,6 @@ export default class ChatWindow extends LightningElement {
         Capture when a user presses enter, in order to send the message
     */
     handleKeyPress(event){
-        console.log(event.target.value);
-        console.log(event.target.value.data);
         if(event.code === 'Enter'){
             let trimmedString = event.target.value.substring(0, event.target.value.length - 11); //Remove <p><br></p> from the string to be sent, added by the last 'Enter' keypress
             this.sendMessage(trimmedString);
