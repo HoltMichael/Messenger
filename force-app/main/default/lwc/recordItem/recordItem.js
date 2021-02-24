@@ -1,9 +1,13 @@
-import { LightningElement, api } from 'lwc';
+import { LightningElement, api, wire, track } from 'lwc';
+import { getObjectInfo } from 'lightning/uiObjectInfoApi';
+
 
 export default class RecordList extends LightningElement {
     @api record;
     @api fieldname;
-    @api iconname;
+    @api objectName;
+    @track iconName;
+
 
     /*
         handleSelect
@@ -15,9 +19,34 @@ export default class RecordList extends LightningElement {
         const selectedRecord = new CustomEvent(
             "select",
             {
-                detail : this.record.Id
+                detail : {record : () => this.record.Id, icon: () => this.iconName}
             }
         );
         this.dispatchEvent(selectedRecord);
+    }
+
+    get visibleField(){
+        return this.record[this.fieldname];
+    }
+
+    @wire(getObjectInfo, { objectApiName:  '$objectName'})
+    handleResult({error, data}) {
+        if(data) {
+            // access theme info here
+            // icon URL is availe as themeInfo.iconUrl
+            var url = data.themeInfo.iconUrl || {};
+            var startInt = url.lastIndexOf("/") + 1;
+            var stopInt = url.lastIndexOf("_");
+
+            var prefixURL = url.substring(0, startInt -1);
+            var prefixStartInt = prefixURL.lastIndexOf("/") +1;
+            var prefix = prefixURL.substring(prefixStartInt);
+
+            this.iconName = prefix + ':' + url.substring(startInt, stopInt);
+        }
+        if(error) {
+            console.log('erroring');
+            // handle error
+        }
     }
 }
