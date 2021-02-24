@@ -32,8 +32,8 @@
                         <template if:true={records}>
                             <template for:each={records} for:item="record">
                                 <c-record-item key={record.Id} record={record} 
-                                    onselect={handleSelect} iconname={iconname}
-                                    fieldname={searchfield}>
+                                    onselect={handleSelect} object-name={objectName}
+                                    fieldname={displayField} >
                                 </c-record-item>
                             </template>
                         </template>
@@ -44,14 +44,14 @@
                 <div class="slds-p-left_x-small slds-p-top_x-small">
                     <template if:true={selectedRecord}>
                         <div class="slds-m-top_small slds-combobox__form-element slds-input-has-icon slds-input-has-icon_left-right" role="none">
-                            <!--<span class="slds-icon_container slds-icon-standard-account slds-combobox__input-entity-icon" title="Account">
-                                <lightning-icon icon-name={iconname} ></lightning-icon>
-                            </span>-->
+                            <span class="slds-icon_container slds-icon-standard-account slds-combobox__input-entity-icon" title="Account">
+                                <lightning-icon icon-name={selectedRecordIcon} ></lightning-icon>
+                            </span>
                             <input class="slds-input slds-combobox__input slds-combobox__input-value" 
                                 id="combobox-id-5" aria-controls="listbox-id-5" 
                                 autocomplete="off" role="textbox" type="text" 
                                 placeholder="Select an Option" readonly=""
-                                value={selectedRecord.Name}
+                                value={selectedRecordName}
                                 disabled
                                 />
                             <button class="sicon_container slds-button slds-button_icon slds-input__icon slds-input__icon_right" 

@@ -19,7 +19,7 @@ public with sharing class recordSearchUtils {
         List<objectWrapper> objs = new List<objectWrapper>();
         for (Schema.SObjectType obj : Schema.getGlobalDescribe().values() ){
             Schema.DescribeSObjectResult objResult = obj.getDescribe();
-            if(objResult.isAccessible() && objResult.isFeedEnabled() && objResult.fields.getMap().containsKey('Name')){
+            if(objResult.isAccessible() && objResult.isFeedEnabled() && (objResult.fields.getMap().containsKey('Name') || objResult.Name == 'Case')){
                 objs.add(new objectWrapper(objResult.getName(), objResult.getLabel()));
             }
         }
@@ -32,16 +32,38 @@ public with sharing class recordSearchUtils {
     */
     @AuraEnabled(cacheable = true)
     public static List<SObject> findRecords(String searchKey, String objectName, String searchField){
+        System.debug(searchKey);
+        System.debug(objectName);
+        System.debug(searchField);
+        
         searchKey = String.escapeSingleQuotes(searchKey);
         objectName = String.escapeSingleQuotes(objectName);
         searchField = String.escapeSingleQuotes(searchField);
-        String key = '%' + searchKey + '%';
+        String key = '\'%' + searchKey + '%\'';
         List<SObject> sObjectList = new List<SObject>();
         try{
-            String query = 'Select Id, '+searchField+' From '+objectName +' Where '+searchField +' LIKE :key WITH SECURITY_ENFORCED LIMIT 10';
-            sObjectList = Database.query(QUERY);
+            List<String> fields = searchField.split(',');
+            String whereClause = '';
+            System.debug(fields.size());
+            for(String f : fields){
+                System.debug(f);
+                whereClause += f + ' LIKE ' + key + ' OR';
+            }
+
+            whereClause = whereClause.left(whereClause.length()-2);
+
+            String query = 'Select Id, '+searchField+' From '+objectName +' Where '+whereClause + ' WITH SECURITY_ENFORCED LIMIT 10';
+            System.debug(query);
+            /*String field = 'Name';
+            if(objectName == 'Case'){
+                field = 'CaseNumber';
+            }*/
+            //String query = 'FIND \'' + searchKey + '\' IN ALL FIELDS RETURNING  ' + objectName + '(' + field + ') LIMIT ' + 10;
+            //sObjectList = search.query(query)[0];
+            sObjectList = Database.query(query);
         }catch(System.QueryException e){
         }
+        System.debug('sObjectList: ' + sObjectList);
         return sObjectList;
     }
 

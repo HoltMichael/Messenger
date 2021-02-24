@@ -10,10 +10,13 @@ export default class recordLookup extends LightningElement {
     @track loaded = false;
     @track objectNotSelected = true;
     @track confirmed = false;
+    @track selectedRecordName = '';
+    @track selectedRecordIcon = '';
     @api index;
-    //@api iconname = "standard:account"; Future version, get the icon for each object and show it on screen DescribeTabResult Class in Apex
     @api objectName;
-    @api searchfield = 'Name';
+    @api searchField = 'Name';
+    displayField = 'Name';
+
 
 
     /*
@@ -46,6 +49,15 @@ export default class recordLookup extends LightningElement {
     handleObjectSelect(event){
         this.objectName=event.detail.value;
         this.objectNotSelected = false;
+        if(this.objectName == 'Case'){
+            this.searchField = 'CaseNumber, Subject';
+            this.displayField = 'CaseNumber';
+        }else{
+            this.searchField = 'Name';
+            this.displayField = 'Name';
+        }
+        this.searchKey = '';
+        this.records = [];
     }
 
     /*
@@ -72,13 +84,12 @@ export default class recordLookup extends LightningElement {
             findRecords({
                 searchKey : searchKey, 
                 objectName : this.objectName, 
-                searchField : this.searchfield
+                searchField : this.searchField
             })
             .then(result => {
                 this.records = result;
                 for(let i=0; i < this.records.length; i++){
                     const rec = this.records[i];
-                    this.records[i].Name = rec[this.searchfield];
                 }
                 this.error = undefined;
             })
@@ -86,6 +97,8 @@ export default class recordLookup extends LightningElement {
                 this.error = error;
                 this.records = undefined;
             });
+        }else{
+            this.records = [];
         }
     }
 
@@ -95,14 +108,25 @@ export default class recordLookup extends LightningElement {
         In order to eventually send messages to the Chatter feed related to this particular object
     */
     handleSelect(event){
-        const selectedRecordId = event.detail;
-        /* eslint-disable no-console*/
+        console.log('1');
+        console.log(event);
+        console.log(event.detail);
+        console.log(event.detail.record());
+        const selectedRecordId = event.detail.record();
+        console.log('2');
         this.selectedRecord = this.records.find( record => record.Id === selectedRecordId);
+        console.log('3');
+        this.selectedRecordName = this.selectedRecord[this.displayField];
+        console.log('4');
+        this.selectedRecordIcon = event.detail.icon();
+        console.log('5');
+        console.log(event);
+        console.log(event.icon);
+        console.log(this.selectedRecordIcon);
         /* fire the event with the value of RecordId for the Selected RecordId */
         const selectedRecordEvent = new CustomEvent(
             "selectedrec",
             {
-                //detail : selectedRecordId
                 detail : { recordId : selectedRecordId, index : this.index}
             }
         );
