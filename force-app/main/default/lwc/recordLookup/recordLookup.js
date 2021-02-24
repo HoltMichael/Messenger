@@ -108,21 +108,10 @@ export default class recordLookup extends LightningElement {
         In order to eventually send messages to the Chatter feed related to this particular object
     */
     handleSelect(event){
-        console.log('1');
-        console.log(event);
-        console.log(event.detail);
-        console.log(event.detail.record());
         const selectedRecordId = event.detail.record();
-        console.log('2');
         this.selectedRecord = this.records.find( record => record.Id === selectedRecordId);
-        console.log('3');
         this.selectedRecordName = this.selectedRecord[this.displayField];
-        console.log('4');
         this.selectedRecordIcon = event.detail.icon();
-        console.log('5');
-        console.log(event);
-        console.log(event.icon);
-        console.log(this.selectedRecordIcon);
         /* fire the event with the value of RecordId for the Selected RecordId */
         const selectedRecordEvent = new CustomEvent(
             "selectedrec",

@@ -51,7 +51,8 @@ public with sharing class RecordSearchUtils_Test {
                 for(recordSearchUtils.objectWrapper obj : objs){
                     names.add(obj.label);
                 }
-                System.assert(!names.contains('Case'));
+                System.assert(names.contains('Case'));
+                System.assert(names.contains('Account'));
             }
         Test.stopTest();
     }
