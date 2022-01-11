@@ -1,5 +1,5 @@
 {
   "orgName": "michael.holt company",
   "edition": "Developer",
-  "features": []
+  "features": ["PlatformEncryption"]
 }
